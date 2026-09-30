@@ -889,8 +889,10 @@ export async function runTui(opts: TuiOptions = {}): Promise<void> {
 
   const systemPrompt = opts.settings?.run?.system_prompt ??
     "You are muse-ts, a terminal coding assistant. Be direct, technical, and precise. " +
-    "Use workspace tools (read_file, write_file, list_dir, bash, search) to inspect and edit code. " +
+    "For casual greetings or simple questions, respond conversationally WITHOUT calling any tools. " +
+    "Only use workspace tools (read_file, write_file, list_dir, bash, search) when the user explicitly asks you to inspect, edit, build, or debug code. " +
     "Scope every search to explicit directories; never scan the whole filesystem. " +
+    "Always ask what project and task the user wants before exploring files. " +
     "Explain plans briefly before running mutating commands.";
 
   const history: ChatMessage[] = [
@@ -979,12 +981,29 @@ export async function runTui(opts: TuiOptions = {}): Promise<void> {
         continue;
       } else if (command === "model") {
         if (!arg) {
-          console.log(`model: ${chalk.green(client.model)}`);
+          console.log(`current model: ${chalk.green(client.model)}`);
           try {
             const models = await client.listModels();
-            console.log(chalk.dim(models.slice(0, 20).join(", ")));
-          } catch (err) {
-            console.log(chalk.dim(`(model list unavailable: ${(err as Error).message})`));
+            const displayModels = models.slice(0, 20);
+            const { picked } = await inquirer.prompt<{ picked: string }>([
+              {
+                type: "select",
+                name: "picked",
+                message: "Select model",
+                choices: displayModels.map((m) => ({
+                  name: m === client.model ? `${m} ${chalk.dim("(current)")}` : m,
+                  value: m,
+                })),
+                pageSize: 12,
+              },
+            ]);
+            if (picked && picked !== client.model) {
+              model = picked;
+              (client as { model: string }).model = picked;
+              console.log(`model → ${chalk.green(picked)}`);
+            }
+          } catch {
+            console.log(chalk.dim("(model selection cancelled)"));
           }
         } else {
           model = arg;
@@ -997,7 +1016,28 @@ export async function runTui(opts: TuiOptions = {}): Promise<void> {
           "none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra",
         ];
         if (!arg) {
-          console.log(`effort: ${chalk.green(client.reasoningEffort)}`);
+          console.log(`current effort: ${chalk.green(client.reasoningEffort)}`);
+          try {
+            const { picked } = await inquirer.prompt<{ picked: string }>([
+              {
+                type: "select",
+                name: "picked",
+                message: "Select reasoning effort",
+                choices: levels.map((l) => ({
+                  name: l === client.reasoningEffort ? `${l} ${chalk.dim("(current)")}` : l,
+                  value: l,
+                })),
+                pageSize: 10,
+              },
+            ]);
+            if (picked && picked !== client.reasoningEffort) {
+              effort = picked as ReasoningEffort;
+              (client as { reasoningEffort: ReasoningEffort }).reasoningEffort = effort;
+              console.log(`effort → ${chalk.green(picked)}`);
+            }
+          } catch {
+            console.log(chalk.dim("(effort selection cancelled)"));
+          }
         } else if ((levels as string[]).includes(arg)) {
           effort = arg as ReasoningEffort;
           (client as { reasoningEffort: ReasoningEffort }).reasoningEffort = effort;
@@ -1009,7 +1049,26 @@ export async function runTui(opts: TuiOptions = {}): Promise<void> {
       } else if (command === "approval") {
         const modes: ApprovalMode[] = ["untrusted", "on-request", "never"];
         if (!arg) {
-          console.log(`approval: ${chalk.green(tools.approvalMode)}`);
+          console.log(`current approval: ${chalk.green(tools.approvalMode)}`);
+          try {
+            const { picked } = await inquirer.prompt<{ picked: string }>([
+              {
+                type: "select",
+                name: "picked",
+                message: "Select approval mode",
+                choices: modes.map((m) => ({
+                  name: m === tools.approvalMode ? `${m} ${chalk.dim("(current)")}` : m,
+                  value: m,
+                })),
+              },
+            ]);
+            if (picked && picked !== tools.approvalMode) {
+              tools.approvalMode = picked as ApprovalMode;
+              console.log(`approval → ${chalk.green(picked)}`);
+            }
+          } catch {
+            console.log(chalk.dim("(approval selection cancelled)"));
+          }
         } else if ((modes as string[]).includes(arg)) {
           tools.approvalMode = arg as ApprovalMode;
           console.log(`approval → ${chalk.green(arg)}`);
