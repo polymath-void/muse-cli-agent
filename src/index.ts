@@ -571,7 +571,7 @@ export async function main(argv: string[] = process.argv): Promise<void> {
     .description("Run one prompt non-interactively (headless)")
     .option("--json", "emit machine-readable JSONL events on stdout")
     .option("--prompt-file <path>", "read the prompt from a file")
-    .option("--max-model-steps <n>", "cap model steps", "4")
+    .option("--max-model-steps <n>", "cap model steps (0 = uncapped)", "0")
     .argument("[prompt]", "prompt text")
     .action(async (promptArg: string | undefined, cmdOpts: { json?: boolean; promptFile?: string; maxModelSteps?: string }) => {
       let prompt = promptArg ?? "";
@@ -641,7 +641,10 @@ export async function main(argv: string[] = process.argv): Promise<void> {
         const workspace = path.resolve(String(global.workspace ?? process.cwd()));
         const tools = new WorkspaceTools(workspace, approvalMode);
 
-        const maxSteps = Number(cmdOpts.maxModelSteps ?? 4);
+        // Uncapped by default (user: ignore max step count). Only cap if explicitly passed >0.
+        const maxStepsRaw = Number(cmdOpts.maxModelSteps ?? 0);
+        const maxSteps = maxStepsRaw > 0 ? maxStepsRaw : Number.POSITIVE_INFINITY;
+        if (!Number.isFinite(maxSteps)) emit({ type: "uncapped" });
         const execSystemPrompt =
           "You are muse-ts in WORKER MODE — invoked headlessly by an external orchestrator agent. " +
           "Execute the given task precisely and efficiently. " +
@@ -654,7 +657,8 @@ export async function main(argv: string[] = process.argv): Promise<void> {
         ];
         
         emit({ type: "turn_start", model: client.model });
-        for (let step = 0; step < maxSteps; step++) {
+        for (let step = 0; ; step++) {
+          if (step >= maxSteps) break;
           const reply = await client.chatOnce(messages, defs);
           messages.push(reply);
 
@@ -673,7 +677,7 @@ export async function main(argv: string[] = process.argv): Promise<void> {
               const realName = call.function.name.slice("bridge_".length);
               try {
                 const args = JSON.parse(call.function.arguments || "{}") as Record<string, unknown>;
-                const ok = tools.approvalMode === "never" ? true : await tools.approve("bridge", realName);
+                const ok = tools.approvalMode === "never" ? true : await tools.approve("bridge", `bridge ${realName} ? [Enter to run / n to deny]`);
                 result = ok ? await bridgeClient.callTool(realName, args) : "denied by approval policy";
               } catch (err) {
                 result = `error: ${(err as Error).message}`;
@@ -838,6 +842,7 @@ export async function main(argv: string[] = process.argv): Promise<void> {
         noSessionLog: global.sessionLog === false,
         bridge,
         initialPrompt: prompt,
+        yolo: Boolean(global.yolo || global.disableApproval),
       });
     } finally {
       if (bridgeClient) await bridgeClient.close().catch(() => {});

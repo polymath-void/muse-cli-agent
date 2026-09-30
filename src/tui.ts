@@ -26,6 +26,7 @@ import { search, select } from "@inquirer/prompts";
 import chalk from "chalk";
 import { resolveCredential, DEFAULT_API_BASE_URL } from "./auth.js";
 import { runInit } from "./nodeos.js";
+import { NanoRegistry, FsNano, MentionNano, PluginNano, PermissionNano, SessionNano } from "./services/index.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -72,7 +73,9 @@ export interface TuiOptions {
   noSessionLog?: boolean;
   bridge?: BridgeToolProvider;
   initialPrompt?: string;
+  /** 0/undefined = uncapped (run until model stops calling tools). */
   maxModelSteps?: number;
+  yolo?: boolean;
   settings?: any;
 }
 
@@ -397,63 +400,55 @@ export class MetaChatClient {
 
 export class WorkspaceTools {
   readonly root: string;
-  approvalMode: ApprovalMode;
+  readonly fsNano: FsNano;
+  readonly perms: PermissionNano;
 
-  constructor(root: string, approvalMode: ApprovalMode = "on-request") {
+  constructor(root: string, approvalMode: ApprovalMode = "on-request", yolo = false) {
     this.root = path.resolve(root);
-    this.approvalMode = approvalMode;
+    this.fsNano = new FsNano(this.root);
+    this.perms = new PermissionNano(approvalMode, yolo);
+  }
+
+  get approvalMode(): ApprovalMode {
+    return this.perms.approvalMode;
+  }
+
+  set approvalMode(m: ApprovalMode) {
+    this.perms.approvalMode = m;
+  }
+
+  get yolo(): boolean {
+    return this.perms.yolo;
+  }
+
+  set yolo(v: boolean) {
+    this.perms.yolo = v;
   }
 
   resolve(p: string): string {
-    const abs = path.isAbsolute(p) ? path.normalize(p) : path.resolve(this.root, p);
-    const rel = path.relative(this.root, abs);
-    if (rel.startsWith("..") || path.isAbsolute(rel)) {
-      throw new Error(`path escapes workspace root: ${p}`);
-    }
-    return abs;
+    return this.fsNano.resolve(p);
   }
 
+  /** Enter-to-run gate (default YES) — delegates to PermissionNano. */
   async approve(action: string, detail: string): Promise<boolean> {
-    if (this.approvalMode === "never") return true;
-    if (this.approvalMode === "untrusted") return false;
-    try {
-      const { ok } = await inquirer.prompt<{ ok: boolean }>([
-        {
-          type: "confirm",
-          name: "ok",
-          message: `${action} ${detail} ?`,
-          default: false,
-        },
-      ]);
-      return ok;
-    } catch {
-      return false;
-    }
+    const d = await this.perms.approve(action, detail);
+    return d.allowed;
   }
 
   readFile(p: string, offset = 1, limit = 200): string {
-    const abs = this.resolve(p);
-    const raw = fs.readFileSync(abs, "utf-8");
-    const lines = raw.split("\n");
-    const start = Math.max(1, offset);
-    const slice = lines.slice(start - 1, start - 1 + Math.min(Math.max(1, limit), 2000));
-    const numbered = slice.map((ln, i) => `${String(start + i).padStart(5)}| ${ln}`);
-    return numbered.join("\n");
+    return this.fsNano.readFileSync(p, offset, limit);
   }
 
   writeFile(p: string, content: string): string {
     const abs = this.resolve(p);
     fs.mkdirSync(path.dirname(abs), { recursive: true });
     fs.writeFileSync(abs, content, "utf-8");
+    this.fsNano.invalidate(p);
     return `wrote ${content.length} bytes to ${path.relative(this.root, abs) || abs}`;
   }
 
   listDir(p = "."): string {
-    const abs = this.resolve(p);
-    const entries = fs.readdirSync(abs, { withFileTypes: true });
-    return entries
-      .map((e) => `${e.isDirectory() ? "dir " : "file"} ${e.name}`)
-      .join("\n");
+    return this.fsNano.listDirSync(p);
   }
 
   bash(command: string, timeoutMs = 10_000): Promise<{ stdout: string; stderr: string; exitCode: number }> {
@@ -478,50 +473,9 @@ export class WorkspaceTools {
     });
   }
 
-  /** Scoped literal search. Skips .git/node_modules; caps files + matches. */
+  /** Scoped literal search (FsNano: cached, ignore-aware, bounded). */
   search(pattern: string, dir = ".", maxMatches = 50): string {
-    const abs = this.resolve(dir);
-    const results: string[] = [];
-    const skip = new Set([".git", "node_modules", ".muse"]);
-    const stack: string[] = [abs];
-    let filesScanned = 0;
-    while (stack.length > 0 && results.length < maxMatches && filesScanned < 2000) {
-      const cur = stack.pop() as string;
-      let entries: fs.Dirent[];
-      try {
-        entries = fs.readdirSync(cur, { withFileTypes: true });
-      } catch {
-        continue;
-      }
-      for (const e of entries) {
-        if (results.length >= maxMatches) break;
-        if (skip.has(e.name)) continue;
-        const full = path.join(cur, e.name);
-        if (e.isDirectory()) {
-          stack.push(full);
-        } else if (e.isFile()) {
-          filesScanned++;
-          let text: string;
-          try {
-            const stat = fs.statSync(full);
-            if (stat.size > 512 * 1024) continue;
-            text = fs.readFileSync(full, "utf-8");
-          } catch {
-            continue;
-          }
-          const lines = text.split("\n");
-          for (let i = 0; i < lines.length && results.length < maxMatches; i++) {
-            if (lines[i].includes(pattern)) {
-              const rel = path.relative(this.root, full);
-              results.push(`${rel}:${i + 1}: ${lines[i].slice(0, 300)}`);
-            }
-          }
-        }
-      }
-    }
-    return results.length > 0
-      ? results.join("\n")
-      : `(no matches for ${JSON.stringify(pattern)} in ${dir})`;
+    return this.fsNano.searchSync(pattern, dir, maxMatches);
   }
 
   /** Execute one model tool call. Returns text for the tool result message. */
@@ -686,6 +640,9 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   { name: "logout", description: "remove stored Meta credentials", usage: "/logout" },
   { name: "init", description: "NodeOS readiness briefing for this workspace", usage: "/init" },
   { name: "boot", description: "boot the NodeOS daemon when offline, then re-check", usage: "/boot" },
+  { name: "project", description: "attach @project context into this turn", usage: "/project <name>" },
+  { name: "skill", description: "attach @skill context into this turn", usage: "/skill <name>" },
+  { name: "plugins", description: "list loaded plugins", usage: "/plugins" },
   { name: "exit", description: "leave the TUI", usage: "/exit" },
   { name: "quit", description: "leave the TUI (alias)", usage: "/quit" },
 ];
@@ -796,7 +753,8 @@ function helpText(): string {
     ...rows,
     "",
     chalk.dim("Tip: type / alone to pick from an interactive menu."),
-    chalk.dim("Any other input is sent to the model. Tool calls ask for approval unless mode is `never`."),
+    chalk.dim("Any other input is sent to the model. Approvals are Enter-to-run unless mode is `never`."),
+    chalk.dim("Inline mentions: @file <path> · @project <name> · @skill <name> (or /project, /skill)."),
   ].join("\n");
 }
 
@@ -849,7 +807,18 @@ export async function runTui(opts: TuiOptions = {}): Promise<void> {
     parallelToolCalls: opts.parallelToolCalls ?? false,
     provider: effectiveProvider,
   });
-  const tools = new WorkspaceTools(workspace, approvalMode);
+  const tools = new WorkspaceTools(workspace, approvalMode, opts.yolo ?? false);
+  // Micro/nano wiring: only-needed runs, rest sleeps via registry idle TTLs.
+  const nanos = new NanoRegistry();
+  const mentionNano = new MentionNano(workspace);
+  const pluginNano = new PluginNano(workspace);
+  const sessionNano = new SessionNano(workspace, opts.sessionId, opts.noSessionLog ?? false);
+  nanos.register(tools.fsNano);
+  nanos.register(mentionNano);
+  nanos.register(pluginNano);
+  nanos.register(tools.perms);
+  nanos.register(sessionNano);
+  nanos.use("fs");
   const session = createSession(workspace, opts.sessionId);
   const noLog = opts.noSessionLog ?? false;
   if (!noLog && session.sessionFile) {
@@ -960,6 +929,7 @@ export async function runTui(opts: TuiOptions = {}): Promise<void> {
       }
       if (command === "exit" || command === "quit") {
         console.log(chalk.dim("bye."));
+        nanos.sleepAll();
         break;
       } else if (command === "help") {
         console.log(helpText());
@@ -1110,7 +1080,59 @@ export async function runTui(opts: TuiOptions = {}): Promise<void> {
           chalk.cyan(command === "login" ? "muse-ts login" : "muse-ts logout"),
         );
         continue;
+      } else if (command === "project" || command === "skill") {
+        const kind = command as "project" | "skill";
+        if (!arg) {
+          console.log(chalk.red(`usage: /${kind} <name>  (or type @${kind} <name> inline)`));
+          continue;
+        }
+        try {
+          const r = mentionNano.expand(`@${kind} ${arg}`);
+          if (r.errors.length > 0) console.log(chalk.red(r.errors.join("\n")));
+          if (r.contextBlock) {
+            history.push({ role: "user", content: r.expanded });
+            console.log(chalk.dim(r.contextBlock.slice(0, 2000)));
+            console.log(chalk.green(`attached @${kind} ${arg} — will send on next turn.`));
+          } else {
+            console.log(chalk.red(`no context found for @${kind} ${arg}`));
+          }
+        } catch (err) {
+          console.log(chalk.red((err as Error).message));
+        }
+        continue;
+      } else if (command === "plugins") {
+        try {
+          await pluginNano.ensureLoaded();
+          const names = pluginNano.loadedNames();
+          const slash = await pluginNano.listSlash();
+          const ptools = await pluginNano.listTools();
+          console.log(chalk.bold("plugins:"));
+          console.log(names.length > 0 ? names.map((n) => `  ${chalk.cyan(n)}`).join("\n") : chalk.dim("  (none — add .mjs files to .muse/plugins/)"));
+          if (slash.length > 0) {
+            console.log(chalk.bold("plugin slash:"));
+            for (const s of slash) console.log(`  /${s.name} — ${s.description}`);
+          }
+          if (ptools.length > 0) {
+            console.log(chalk.bold("plugin tools:"));
+            for (const tool of ptools) console.log(`  ${chalk.cyan(tool.name)} — ${tool.description ?? ""}`);
+          }
+        } catch (err) {
+          console.log(chalk.red((err as Error).message));
+        }
+        continue;
       } else {
+        // plugin slash commands take precedence over "unknown"
+        try {
+          const out = await pluginNano.runSlash(command, arg);
+          if (out !== null) {
+            console.log(out.slice(0, 4000));
+            appendSessionLine(session, { type: "plugin_slash", ts: new Date().toISOString(), name: command, content: out.slice(0, 4000) }, noLog);
+            continue;
+          }
+        } catch (err) {
+          console.log(chalk.red(`plugin /${command} failed: ${(err as Error).message}`));
+          continue;
+        }
         console.log(chalk.red(`unknown command: /${command} (pick one below)`));
         const picked = await promptSlashMenu(command);
         if (picked) queuedInitial = `/${picked}`;
@@ -1118,9 +1140,21 @@ export async function runTui(opts: TuiOptions = {}): Promise<void> {
       }
     }
 
-    // ---- normal turn ----
-    history.push({ role: "user", content: userText });
-    appendSessionLine(session, { type: "user", ts: new Date().toISOString(), content: userText }, noLog);
+    // ---- normal turn (mentions expanded inline: @file/@project/@skill) ----
+    let turnText = userText;
+    try {
+      nanos.use("mentions");
+      const mx = mentionNano.expand(userText);
+      if (mx.errors.length > 0) console.log(chalk.red(mx.errors.join("\n")));
+      if (mx.contextBlock) {
+        console.log(chalk.dim(`attached ${mx.mentions.length} mention(s)`));
+        turnText = mx.expanded;
+      }
+    } catch (err) {
+      console.log(chalk.red(`mention expand failed: ${(err as Error).message}`));
+    }
+    history.push({ role: "user", content: turnText });
+    appendSessionLine(session, { type: "user", ts: new Date().toISOString(), content: turnText }, noLog);
 
     // Refresh credentials each turn (env may change; login may have run elsewhere).
     resolved = resolveCredential();
@@ -1136,8 +1170,14 @@ export async function runTui(opts: TuiOptions = {}): Promise<void> {
       }
     }
 
-    const maxSteps = opts.maxModelSteps ?? 8;
-    for (let step = 0; step < maxSteps; step++) {
+    const capOpt = opts.maxModelSteps ?? 0;
+    const maxSteps = capOpt && capOpt > 0 ? capOpt : Number.POSITIVE_INFINITY;
+    if (!Number.isFinite(maxSteps)) console.log(chalk.dim("(uncapped turns — runs until the model stops calling tools)"));
+    for (let step = 0; ; step++) {
+      if (step >= maxSteps) {
+        console.log(chalk.dim("(model step cap reached — pass maxModelSteps: 0 for uncapped)"));
+        break;
+      }
       let defs: ToolDefinition[] = [...WORKSPACE_TOOL_DEFS];
       // Merge bridge tools as model-callable functions.
       if (opts.bridge) {
@@ -1159,6 +1199,23 @@ export async function runTui(opts: TuiOptions = {}): Promise<void> {
         } catch {
           /* bridge failures degrade to workspace-only */
         }
+      }
+      // Merge lazy plugin tools (activated on demand, slept on idle).
+      try {
+        nanos.use("plugins");
+        const pt = await pluginNano.listTools();
+        for (const tool of pt.slice(0, 32)) {
+          defs.push({
+            type: "function",
+            function: {
+              name: tool.name,
+              description: `[plugin] ${tool.description ?? tool.name}`,
+              parameters: (tool.parameters as Record<string, unknown>) ?? { type: "object", properties: {} },
+            },
+          });
+        }
+      } catch {
+        /* plugin failures degrade to workspace-only */
       }
 
       process.stdout.write(chalk.bold.cyan("\n◈ ") + chalk.dim(`${client.model} · ${client.reasoningEffort}\n`));
@@ -1201,11 +1258,25 @@ export async function runTui(opts: TuiOptions = {}): Promise<void> {
       if (!full.tool_calls || full.tool_calls.length === 0) break;
 
       // Execute tool calls (sequentially for LMK safety; never parallel).
+      // Uncapped: this inner loop always runs to completion; the outer turn
+      // loop only breaks when the model emits zero tool calls.
       for (const call of full.tool_calls) {
         const label = `${call.function.name}(${call.function.arguments.slice(0, 160)})`;
         console.log(chalk.yellow(`\n⚙ tool: ${label}`));
         let result: string;
-        if (call.function.name.startsWith("bridge_") && opts.bridge) {
+        if (call.function.name.startsWith("plugin_")) {
+          try {
+            const args = JSON.parse(call.function.arguments || "{}") as Record<string, unknown>;
+            const ok = await tools.approve("plugin", call.function.name);
+            if (!ok) {
+              result = "denied by approval policy";
+            } else {
+              result = (await pluginNano.callTool(call.function.name, args)) ?? `error: unknown plugin tool: ${call.function.name}`;
+            }
+          } catch (err) {
+            result = `error: ${(err as Error).message}`;
+          }
+        } else if (call.function.name.startsWith("bridge_") && opts.bridge) {
           const realName = call.function.name.slice("bridge_".length);
           try {
             const args = JSON.parse(call.function.arguments || "{}") as Record<string, unknown>;
@@ -1233,11 +1304,11 @@ export async function runTui(opts: TuiOptions = {}): Promise<void> {
         );
       }
       // Continue the loop so the model can consume tool results.
-      if (step === maxSteps - 1) {
-        console.log(chalk.dim("(max model steps reached)"));
-      }
+      // No cap: loop ends only when the model returns no tool calls.
     }
+    nanos.release("plugins");
   }
 
+  nanos.sleepAll();
   appendSessionLine(session, { type: "session_end", ts: new Date().toISOString() }, noLog);
 }
