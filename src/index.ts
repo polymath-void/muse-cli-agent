@@ -689,7 +689,7 @@ export async function main(argv: string[] = process.argv): Promise<void> {
               const realName = call.function.name.slice("bridge_".length);
               try {
                 const args = JSON.parse(call.function.arguments || "{}") as Record<string, unknown>;
-                const ok = tools.approvalMode === "never" ? true : await tools.approve("bridge", `bridge ${realName} ? [Enter to run / n to deny]`);
+                const ok = tools.approvalMode === "never" ? true : await tools.approve("bridge", realName);
                 result = ok ? await bridgeClient.callTool(realName, args) : "denied by approval policy";
               } catch (err) {
                 result = `error: ${(err as Error).message}`;

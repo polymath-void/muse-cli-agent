@@ -41,12 +41,22 @@ export class PermissionNano implements Sleepable {
     if (!process.stdin.isTTY) {
       return { allowed: true, via: "no-tty" };
     }
+    
+    let humanAction = action;
+    if (action === "bash") humanAction = "run a shell command";
+    else if (action === "read_file") humanAction = "read file";
+    else if (action === "write_file") humanAction = "modify file";
+    else if (action === "list_dir") humanAction = "list directory";
+    else if (action === "search") humanAction = "search in";
+    else if (action === "plugin") humanAction = "execute plugin";
+    else if (action === "bridge") humanAction = "execute bridge tool";
+
     try {
       const { ok } = await inquirer.prompt<{ ok: boolean }>([
         {
           type: "confirm",
           name: "ok",
-          message: `${action} ${detail} ? [Enter to run / n to deny]`,
+          message: `The agent wants to ${humanAction}: ${detail}\n  Allow this action?`,
           default: true,
         },
       ]);
