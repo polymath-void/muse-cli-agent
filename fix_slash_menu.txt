@@ -1,0 +1,16 @@
+CRITICAL BUG: The slash command menu is broken in src/tui.ts.
+
+When a user types "/" in the TUI prompt, it should show an interactive popup selector menu (using inquirer) listing all available slash commands. Currently nothing appears — the menu is silent.
+
+Also, when the user starts typing "/mo" or "/ef", it should show a filtered search/autocomplete menu matching commands.
+
+Your task:
+1. Read src/tui.ts — focus on the `promptSlashMenu()` function and where it's called in the main TUI loop (around the `if (userText.startsWith("/"))` block).
+2. Debug why the interactive inquirer prompt (type: "search" or "select") is not rendering. Common causes:
+   - inquirer v14 uses `@inquirer/prompts` not the old API. Check if `inquirer.prompt()` with type "search" actually works, or if it needs `import { search } from '@inquirer/prompts'`.
+   - The `source` callback shape may be wrong for the search prompt.
+3. Fix the menu so "/" pops up an interactive scrollable list and prefix typing filters it.
+4. Also check that "/model", "/effort", "/approval" interactive selectors actually render.
+5. Run `npm run build` to verify.
+
+Do NOT read package.json, tsconfig.json, or REQUIREMENTS.md. Go straight to src/tui.ts.

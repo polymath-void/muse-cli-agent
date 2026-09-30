@@ -22,6 +22,7 @@ import * as path from "node:path";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import inquirer from "inquirer";
+import { search, select } from "@inquirer/prompts";
 import chalk from "chalk";
 import { resolveCredential, DEFAULT_API_BASE_URL } from "./auth.js";
 import { runInit } from "./nodeos.js";
@@ -719,47 +720,45 @@ function slashChoices(cmds: SlashCommand[] = SLASH_COMMANDS): { name: string; va
 }
 
 /**
- * Interactive "/" menu — no extra dependencies.
- * Uses inquirer's built-in `search` prompt (filter-as-you-type) with an
+ * Interactive "/" menu — uses @inquirer/prompts directly (inquirer v14).
+ * `search` gives an interactive scrollable filter-as-you-type list, with an
  * automatic fallback to `select` so offline/older terminals still get a list.
  * Resolves to the chosen command name (without "/"), or null on cancel.
  */
 export async function promptSlashMenu(initialFilter?: string): Promise<string | null> {
-  const hint = initialFilter?.trim() ? ` (filter: ${initialFilter.trim()})` : "";
+  const cleanFilter = (initialFilter ?? "").trim().replace(/^\/+/, "");
+  const hint = cleanFilter ? ` (filter: ${cleanFilter})` : "";
+  const pageSize = Math.min(Math.max(SLASH_COMMANDS.length, 8), 16);
   try {
-    const { cmd } = await inquirer.prompt<{ cmd: string }>([
-      {
-        type: "search",
-        name: "cmd",
-        message: `slash command${hint}`,
-        source: async (term: string | undefined) => {
-          const q = term ?? initialFilter ?? "";
-          const matches = filterSlashCommands(q);
-          if (matches.length > 0) return slashChoices(matches);
-          return slashChoices();
-        },
-      } as unknown as { type: string; name: string; message: string },
-    ]);
+    const cmd = await search({
+      message: `slash command${hint}`,
+      // Pre-fill the interactive filter box so "/mo" narrows the list immediately.
+      ...(cleanFilter ? { initialValue: cleanFilter } : {}),
+      pageSize,
+      source: async (term: string | undefined) => {
+        const q = term ?? cleanFilter;
+        const matches = filterSlashCommands(q);
+        if (matches.length > 0) return slashChoices(matches);
+        return slashChoices();
+      },
+    });
     return typeof cmd === "string" && cmd.length > 0 ? cmd : null;
   } catch {
     /* search unavailable or dismissed — fall back to a plain list */
   }
   try {
-    const prefiltered = filterSlashCommands(initialFilter ?? "");
-    const { cmd } = await inquirer.prompt<{ cmd: string }>([
-      {
-        type: "select",
-        name: "cmd",
-        message: `slash command${hint}`,
-        choices: slashChoices(prefiltered.length > 0 ? prefiltered : SLASH_COMMANDS),
-        pageSize: Math.min(Math.max(SLASH_COMMANDS.length, 8), 16),
-      },
-    ]);
+    const prefiltered = filterSlashCommands(cleanFilter);
+    const cmd = await select({
+      message: `slash command${hint}`,
+      choices: slashChoices(prefiltered.length > 0 ? prefiltered : SLASH_COMMANDS),
+      pageSize,
+    });
     return typeof cmd === "string" && cmd.length > 0 ? cmd : null;
   } catch {
     return null;
   }
 }
+
 
 // ---------------------------------------------------------------------------
 // Rendering helpers
@@ -988,18 +987,14 @@ export async function runTui(opts: TuiOptions = {}): Promise<void> {
           try {
             const models = await client.listModels();
             const displayModels = models.slice(0, 20);
-            const { picked } = await inquirer.prompt<{ picked: string }>([
-              {
-                type: "select",
-                name: "picked",
-                message: "Select model",
-                choices: displayModels.map((m) => ({
-                  name: m === client.model ? `${m} ${chalk.dim("(current)")}` : m,
-                  value: m,
-                })),
-                pageSize: 12,
-              },
-            ]);
+            const picked: string = await select({
+              message: "Select model",
+              choices: displayModels.map((m) => ({
+                name: m === client.model ? `${m} ${chalk.dim("(current)")}` : m,
+                value: m,
+              })),
+              pageSize: 12,
+            });
             if (picked && picked !== client.model) {
               model = picked;
               (client as { model: string }).model = picked;
@@ -1021,18 +1016,14 @@ export async function runTui(opts: TuiOptions = {}): Promise<void> {
         if (!arg) {
           console.log(`current effort: ${chalk.green(client.reasoningEffort)}`);
           try {
-            const { picked } = await inquirer.prompt<{ picked: string }>([
-              {
-                type: "select",
-                name: "picked",
-                message: "Select reasoning effort",
-                choices: levels.map((l) => ({
-                  name: l === client.reasoningEffort ? `${l} ${chalk.dim("(current)")}` : l,
-                  value: l,
-                })),
-                pageSize: 10,
-              },
-            ]);
+            const picked: string = await select({
+              message: "Select reasoning effort",
+              choices: levels.map((l) => ({
+                name: l === client.reasoningEffort ? `${l} ${chalk.dim("(current)")}` : l,
+                value: l,
+              })),
+              pageSize: 10,
+            });
             if (picked && picked !== client.reasoningEffort) {
               effort = picked as ReasoningEffort;
               (client as { reasoningEffort: ReasoningEffort }).reasoningEffort = effort;
@@ -1054,17 +1045,13 @@ export async function runTui(opts: TuiOptions = {}): Promise<void> {
         if (!arg) {
           console.log(`current approval: ${chalk.green(tools.approvalMode)}`);
           try {
-            const { picked } = await inquirer.prompt<{ picked: string }>([
-              {
-                type: "select",
-                name: "picked",
-                message: "Select approval mode",
-                choices: modes.map((m) => ({
-                  name: m === tools.approvalMode ? `${m} ${chalk.dim("(current)")}` : m,
-                  value: m,
-                })),
-              },
-            ]);
+            const picked: string = await select({
+              message: "Select approval mode",
+              choices: modes.map((m) => ({
+                name: m === tools.approvalMode ? `${m} ${chalk.dim("(current)")}` : m,
+                value: m,
+              })),
+            });
             if (picked && picked !== tools.approvalMode) {
               tools.approvalMode = picked as ApprovalMode;
               console.log(`approval → ${chalk.green(picked)}`);
