@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/data/data/com.termux/files/usr/bin/env node
 /**
  * src/index.ts — muse-ts: native TypeScript CLI coding assistant.
  *
@@ -844,7 +844,7 @@ const invokedAsScript =
   (process.argv[1].endsWith("/index.ts") ||
     process.argv[1].endsWith("/index.js") ||
     process.argv[1].endsWith("\\index.ts") ||
-    process.argv[1].endsWith("\\index.js"));
+    process.argv[1].endsWith("\\index.js") || process.argv[1].endsWith("muse-cli"));
 if (invokedAsScript) {
   main().catch((err) => {
     console.error(chalk.red(err?.message ?? String(err)));
