@@ -1,0 +1,14 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "runInit",
+        "hash": "4caac9126b80cc58e1ed0416ca1c7eb7487950206cd7978f082223f6e3f9c11e",
+        "file": "/home/Projects/muse-cli-agent/src/nodeos.ts",
+        "line_number": 45,
+        "calls": [
+            "runInit"
+        ]
+    },
+    "source": "export async function runInit(opts: { boot?: boolean; target?: string }",
+    "skeleton": "export async function runInit(opts: { ... }"
+}

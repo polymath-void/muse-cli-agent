@@ -1,0 +1,22 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "createSession",
+        "hash": "5e4ccc0466260ae265b6eef64d4a6d62d74f9c47ddf6e5a3147d812dc0d372f7",
+        "file": "/home/Projects/muse-cli-agent/src/tui.ts",
+        "line_number": 608,
+        "calls": [
+            "createSession",
+            "Date",
+            "String",
+            "randomUUID",
+            "getDate",
+            "join",
+            "padStart",
+            "getMonth",
+            "getFullYear"
+        ]
+    },
+    "source": "export function createSession(workspace: string, sessionId?: string): SessionInfo {\n  const id = sessionId ?? randomUUID();\n  const now = new Date();\n  const yyyy = String(now.getFullYear());\n  const mm = String(now.getMonth() + 1).padStart(2, \"0\");\n  const dd = String(now.getDate()).padStart(2, \"0\");\n  const dir = path.join(workspace, \".muse\", \"sessions\", yyyy, mm, dd, id);\n  return { sessionId: id, sessionDir: dir, sessionFile: path.join(dir, \"session.jsonl\"), workspace };\n}",
+    "skeleton": "export function createSession(workspace: string, sessionId?: string): SessionInfo { ... }"
+}

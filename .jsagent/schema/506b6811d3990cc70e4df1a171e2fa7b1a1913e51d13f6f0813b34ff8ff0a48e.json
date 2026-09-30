@@ -1,0 +1,21 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "refreshAccessToken",
+        "hash": "506b6811d3990cc70e4df1a171e2fa7b1a1913e51d13f6f0813b34ff8ff0a48e",
+        "file": "/home/Projects/muse-cli-agent/src/auth.ts",
+        "line_number": 673,
+        "calls": [
+            "set",
+            "fetchBounded",
+            "AuthError",
+            "slice",
+            "text",
+            "URLSearchParams",
+            "toString",
+            "refreshAccessToken"
+        ]
+    },
+    "source": "export async function refreshAccessToken(\n  tokenEndpoint: string,\n  clientId: string,\n  refreshToken: string,\n  clientSecret?: string,\n): Promise<TokenResponse> {\n  const form = new URLSearchParams();\n  form.set(\"grant_type\", \"refresh_token\");\n  form.set(\"refresh_token\", refreshToken);\n  form.set(\"client_id\", clientId);\n  if (clientSecret) form.set(\"client_secret\", clientSecret);\n  const res = await fetchBounded(tokenEndpoint, {\n    method: \"POST\",\n    headers: { \"content-type\": \"application/x-www-form-urlencoded\" },\n    body: form.toString(),\n  });\n  if (!res.ok) {\n    const text = (await res.text()).slice(0, 300);\n    throw new AuthError(\n      \"refresh_failed\",\n      `your saved login is no longer valid. Log in again or use a different account. (${text || `HTTP ${res.status}`})`,\n    );\n  }\n  return readJsonBounded<TokenResponse>(res);\n}",
+    "skeleton": "export async function refreshAccessToken(\n  tokenEndpoint: string,\n  clientId: string,\n  refreshToken: string,\n  clientSecret?: string,\n): Promise<TokenResponse> { ... }"
+}

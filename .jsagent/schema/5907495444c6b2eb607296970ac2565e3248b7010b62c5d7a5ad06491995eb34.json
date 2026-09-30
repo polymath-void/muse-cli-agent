@@ -1,0 +1,20 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "helpText",
+        "hash": "5907495444c6b2eb607296970ac2565e3248b7010b62c5d7a5ad06491995eb34",
+        "file": "/home/Projects/muse-cli-agent/src/tui.ts",
+        "line_number": 790,
+        "calls": [
+            "bold",
+            "dim",
+            "join",
+            "helpText",
+            "map",
+            "yellow",
+            "padEnd"
+        ]
+    },
+    "source": "function helpText(): string {\n  const rows = SLASH_COMMANDS.map(\n    (c) => `  ${chalk.yellow(c.usage.padEnd(22))} ${c.description}`,\n  );\n  return [\n    chalk.bold(\"Commands:\"),\n    ...rows,\n    \"\",\n    chalk.dim(\"Tip: type / alone to pick from an interactive menu.\"),\n    chalk.dim(\"Any other input is sent to the model. Tool calls ask for approval unless mode is `never`.\"),\n  ].join(\"\\n\");\n}",
+    "skeleton": "function helpText(): string { ... }"
+}

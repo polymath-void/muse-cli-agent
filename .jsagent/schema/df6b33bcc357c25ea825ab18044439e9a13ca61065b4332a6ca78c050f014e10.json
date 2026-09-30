@@ -1,0 +1,18 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "discoverProtectedResource",
+        "hash": "df6b33bcc357c25ea825ab18044439e9a13ca61065b4332a6ca78c050f014e10",
+        "file": "/home/Projects/muse-cli-agent/src/auth.ts",
+        "line_number": 390,
+        "calls": [
+            "replace",
+            "typeof",
+            "discoverProtectedResource",
+            "fetchBounded",
+            "originOf"
+        ]
+    },
+    "source": "export async function discoverProtectedResource(\n  apiBaseUrl: string,\n): Promise<ProtectedResourceMetadata | null> {\n  const origin = originOf(apiBaseUrl);\n  const candidates = [\n    `${origin}/.well-known/oauth-protected-resource`,\n    `${apiBaseUrl.replace(/\\/+$/, \"\")}/.well-known/oauth-protected-resource`,\n  ];\n  for (const url of candidates) {\n    try {\n      const res = await fetchBounded(url, {\n        headers: { accept: \"application/json\" },\n        timeoutMs: 10_000,\n      });\n      if (!res.ok) continue;\n      const meta = await readJsonBounded<ProtectedResourceMetadata>(res);\n      if (meta && typeof (meta as { resource?: unknown }).resource === \"string\") {\n        return meta;\n      }\n    } catch {\n      continue;\n    }\n  }\n  return null;\n}",
+    "skeleton": "export async function discoverProtectedResource(\n  apiBaseUrl: string,\n): Promise<ProtectedResourceMetadata | null> { ... }"
+}

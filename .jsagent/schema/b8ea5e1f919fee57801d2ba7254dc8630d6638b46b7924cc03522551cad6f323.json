@@ -1,0 +1,14 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "banner",
+        "hash": "b8ea5e1f919fee57801d2ba7254dc8630d6638b46b7924cc03522551cad6f323",
+        "file": "/home/Projects/muse-cli-agent/src/tui.ts",
+        "line_number": 767,
+        "calls": [
+            "banner"
+        ]
+    },
+    "source": "export function banner(opts: {\n  model: string;\n  effort: string;\n  workspace: string;\n  sessionId: string;\n  approval: string;\n  provider: string;\n}",
+    "skeleton": "export function banner(opts: { ... }"
+}

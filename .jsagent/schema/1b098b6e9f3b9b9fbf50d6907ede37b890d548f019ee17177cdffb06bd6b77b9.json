@@ -1,0 +1,16 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "clearMetaAuth",
+        "hash": "1b098b6e9f3b9b9fbf50d6907ede37b890d548f019ee17177cdffb06bd6b77b9",
+        "file": "/home/Projects/muse-cli-agent/src/auth.ts",
+        "line_number": 255,
+        "calls": [
+            "clearMetaAuth",
+            "saveAuthFile",
+            "loadAuthFile"
+        ]
+    },
+    "source": "export function clearMetaAuth(authPath?: string): boolean {\n  const file = loadAuthFile(authPath);\n  if (!(\"meta\" in file.providers)) return false;\n  delete file.providers[\"meta\"];\n  saveAuthFile(file, authPath);\n  return true;\n}",
+    "skeleton": "export function clearMetaAuth(authPath?: string): boolean { ... }"
+}

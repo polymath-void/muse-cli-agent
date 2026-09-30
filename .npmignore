@@ -1,0 +1,13 @@
+# Source files (only publish dist/)
+src/
+tests/
+tsconfig.json
+
+# Development & Workspace Data
+.agents/
+.jsagent/
+.muse/
+agy_nodeos.db
+daemon.log
+workflow.json
+hello.py

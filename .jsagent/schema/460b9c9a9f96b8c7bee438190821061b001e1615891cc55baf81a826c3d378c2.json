@@ -1,0 +1,23 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "requestDeviceAuthorization",
+        "hash": "460b9c9a9f96b8c7bee438190821061b001e1615891cc55baf81a826c3d378c2",
+        "file": "/home/Projects/muse-cli-agent/src/auth.ts",
+        "line_number": 531,
+        "calls": [
+            "found",
+            "set",
+            "AuthError",
+            "isFinite",
+            "slice",
+            "text",
+            "toString",
+            "URLSearchParams",
+            "fetchBounded",
+            "requestDeviceAuthorization"
+        ]
+    },
+    "source": "export async function requestDeviceAuthorization(\n  deviceAuthorizationEndpoint: string,\n  clientId: string,\n  scope?: string,\n): Promise<DeviceAuthorizationResponse> {\n  const form = new URLSearchParams();\n  form.set(\"client_id\", clientId);\n  if (scope && scope.length > 0) form.set(\"scope\", scope);\n  const res = await fetchBounded(deviceAuthorizationEndpoint, {\n    method: \"POST\",\n    headers: { \"content-type\": \"application/x-www-form-urlencoded\" },\n    body: form.toString(),\n  });\n  if (!res.ok) {\n    const text = (await res.text()).slice(0, 500);\n    if (res.status === 404) {\n      throw new AuthError(\n        \"device_endpoint_missing\",\n        \"device authorization endpoint not found (unlanded or gated off)\",\n        text,\n      );\n    }\n    throw new AuthError(\n      \"device_authorization_failed\",\n      `device authorization failed: HTTP ${res.status} ${text}`,\n    );\n  }\n  const data = await readJsonBounded<DeviceAuthorizationResponse>(res);\n  if (!data.device_code || !data.user_code || !data.verification_uri) {\n    throw new AuthError(\n      \"device_authorization_malformed\",\n      \"device authorization response missing user_code or verification_uri\",\n    );\n  }\n  if (!data.verification_uri_complete) {\n    data.verification_uri_complete = data.verification_uri;\n  }\n  if (!Number.isFinite(data.expires_in) || data.expires_in <= 0) {\n    data.expires_in = 600;\n  }\n  return data;\n}",
+    "skeleton": "export async function requestDeviceAuthorization(\n  deviceAuthorizationEndpoint: string,\n  clientId: string,\n  scope?: string,\n): Promise<DeviceAuthorizationResponse> { ... }"
+}

@@ -1,0 +1,14 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "loginDeviceFlow",
+        "hash": "9286bbb3e295a8f9f2945eb7e527185d7ab390b75aab7481e0e016283917e65c",
+        "file": "/home/Projects/muse-cli-agent/src/auth.ts",
+        "line_number": 817,
+        "calls": [
+            "loginDeviceFlow"
+        ]
+    },
+    "source": "export async function loginDeviceFlow(\n  opts: LoginOptions = {}",
+    "skeleton": "export async function loginDeviceFlow(\n  opts: LoginOptions = { ... }"
+}

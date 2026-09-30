@@ -1,0 +1,15 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "openBrowser",
+        "hash": "7161e1d653d22e0e7e8f026d786cf93819fd942674222c9d2affe0af3b35f634",
+        "file": "/home/Projects/muse-cli-agent/src/auth.ts",
+        "line_number": 787,
+        "calls": [
+            "spawnSync",
+            "openBrowser"
+        ]
+    },
+    "source": "export function openBrowser(url: string): boolean {\n  const testOpener = process.env.TBH_TEST_BROWSER_OPENER;\n  if (testOpener && testOpener.length > 0) {\n    try {\n      const r = spawnSync(testOpener, [url], { stdio: \"ignore\", shell: true });\n      if (r.status === 0) return true;\n    } catch {\n      /* fall through */\n    }\n  }\n  const candidates: string[][] = [\n    [\"termux-open-url\", url],\n    [\"xdg-open\", url],\n    [\"open\", url],\n  ];\n  for (const [cmd, arg] of candidates) {\n    try {\n      const r = spawnSync(cmd, [arg], { stdio: \"ignore\" });\n      if (r.status === 0) return true;\n    } catch {\n      continue;\n    }\n  }\n  return false;\n}",
+    "skeleton": "export function openBrowser(url: string): boolean { ... }"
+}

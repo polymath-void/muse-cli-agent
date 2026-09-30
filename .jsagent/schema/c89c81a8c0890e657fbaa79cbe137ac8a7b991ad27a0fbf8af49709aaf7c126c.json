@@ -1,0 +1,20 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "mintModelApiKey",
+        "hash": "c89c81a8c0890e657fbaa79cbe137ac8a7b991ad27a0fbf8af49709aaf7c126c",
+        "file": "/home/Projects/muse-cli-agent/src/auth.ts",
+        "line_number": 723,
+        "calls": [
+            "replace",
+            "test",
+            "AuthError",
+            "mintModelApiKey",
+            "slice",
+            "text",
+            "fetchBounded"
+        ]
+    },
+    "source": "export async function mintModelApiKey(\n  mintBaseUrl: string,\n  accessToken: string,\n): Promise<MintedKey> {\n  const base = mintBaseUrl.replace(/\\/+$/, \"\");\n  // Observed suffix is `muse-code/key`; the versioned base already ends in\n  // /v1, so try the unversioned host form first, then the /v1 form.\n  const candidates = [`${base}/muse-code/key`, `${base}/v1/muse-code/key`];\n  let lastError = \"\";\n  for (const url of candidates) {\n    for (const method of [\"POST\", \"GET\"] as const) {\n      try {\n        const res = await fetchBounded(url, {\n          method,\n          headers: {\n            authorization: `Bearer ${accessToken}`,\n            accept: \"application/json\",\n            ...(method === \"POST\" ? { \"content-type\": \"application/json\" } : {}),\n          },\n          ...(method === \"POST\" ? { body: \"{}\" } : {}),\n        });\n        if (res.status === 404) {\n          lastError = `HTTP 404 at ${url}`;\n          break; // try next URL, not next method\n        }\n        if (!res.ok) {\n          const text = (await res.text()).slice(0, 500);\n          if (/onboarding|dev\\.meta\\.ai/i.test(text)) {\n            throw new AuthError(\n              \"onboarding_required\",\n              \"your Meta account isn't set up for Model API yet \u2014 finish onboarding at https://dev.meta.ai, then log in again.\",\n            );\n          }\n          lastError = `HTTP ${res.status}: ${text}`;\n          continue;\n        }\n        const data = await readJsonBounded<MintedKey>(res);\n        if (!data.api_key) {\n          lastError = \"mint response missing api_key\";\n          continue;\n        }\n        if (data.require_payment) {\n          const action =\n            data.action_url ??\n            \"https://accountscenter.meta.com/muse_code/?ep=no_payg\";\n          throw new AuthError(\n            \"payment_required\",\n            `Muse Code requires a payment method \u2014 subscribe at ${action}, then log in again.`,\n          );\n        }\n        return data;\n      } catch (err) {\n        if (err instanceof AuthError) throw err;\n        lastError = (err as Error).message;\n      }\n    }\n  }\n  throw new AuthError(\"mint_failed\", `Model API key mint failed: ${lastError}`);\n}",
+    "skeleton": "export async function mintModelApiKey(\n  mintBaseUrl: string,\n  accessToken: string,\n): Promise<MintedKey> { ... }"
+}

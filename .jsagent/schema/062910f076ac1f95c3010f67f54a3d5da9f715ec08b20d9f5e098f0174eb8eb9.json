@@ -1,0 +1,15 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "isSlashMenuTrigger",
+        "hash": "062910f076ac1f95c3010f67f54a3d5da9f715ec08b20d9f5e098f0174eb8eb9",
+        "file": "/home/Projects/muse-cli-agent/src/tui.ts",
+        "line_number": 700,
+        "calls": [
+            "isSlashMenuTrigger",
+            "trim"
+        ]
+    },
+    "source": "export function isSlashMenuTrigger(text: string): boolean {\n  return text.trim() === \"/\";\n}",
+    "skeleton": "export function isSlashMenuTrigger(text: string): boolean { ... }"
+}

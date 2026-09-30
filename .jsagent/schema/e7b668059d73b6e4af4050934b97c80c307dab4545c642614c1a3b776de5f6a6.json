@@ -1,0 +1,15 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "originOf",
+        "hash": "e7b668059d73b6e4af4050934b97c80c307dab4545c642614c1a3b776de5f6a6",
+        "file": "/home/Projects/muse-cli-agent/src/auth.ts",
+        "line_number": 381,
+        "calls": [
+            "URL",
+            "originOf"
+        ]
+    },
+    "source": "function originOf(url: string): string {\n  const u = new URL(url);\n  return `${u.protocol}//${u.host}`;\n}",
+    "skeleton": "function originOf(url: string): string { ... }"
+}

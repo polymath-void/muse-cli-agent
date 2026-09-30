@@ -1,0 +1,20 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "discoverAuthorizationServer",
+        "hash": "819583412908cdd3e21af661756816ef119be0cc6b8b99688b316a1e3b004453",
+        "file": "/home/Projects/muse-cli-agent/src/auth.ts",
+        "line_number": 416,
+        "calls": [
+            "discoverAuthorizationServer",
+            "filter",
+            "replace",
+            "test",
+            "normaliseServerMetadata",
+            "push",
+            "fetchBounded"
+        ]
+    },
+    "source": "export async function discoverAuthorizationServer(\n  authBaseUrl: string,\n  hintIssuers?: string[],\n): Promise<AuthorizationServerMetadata> {\n  const bases = [\n    ...(hintIssuers ?? []).filter((s) => /^https?:\\/\\//i.test(s)),\n    authBaseUrl,\n  ];\n  const tried: string[] = [];\n  for (const base of bases) {\n    const clean = base.replace(/\\/+$/, \"\");\n    for (const wellKnown of [\n      \"/.well-known/oauth-authorization-server\",\n      \"/.well-known/openid-configuration\",\n    ]) {\n      const url = clean + wellKnown;\n      tried.push(url);\n      try {\n        const res = await fetchBounded(url, {\n          headers: { accept: \"application/json\" },\n          timeoutMs: 10_000,\n        });\n        if (!res.ok) continue;\n        const meta = await readJsonBounded<AuthorizationServerMetadata>(res);\n        if (meta && typeof meta.issuer === \"string\" && meta.issuer.length > 0) {\n          return normaliseServerMetadata(meta, clean);\n        }\n      } catch {\n        continue;\n      }\n    }\n  }\n  // Hardcoded fallback grounded in binary strings.\n  const clean = authBaseUrl.replace(/\\/+$/, \"\");\n  return {\n    issuer: clean,\n    device_authorization_endpoint: `${clean}/oidc/device/authorization/`,\n    token_endpoint: `${clean}/oidc/device/token/`,\n    registration_endpoint: `${clean}/oidc/register`,\n    revocation_endpoint: `${clean}/oidc/revoke`,\n  };\n}",
+    "skeleton": "export async function discoverAuthorizationServer(\n  authBaseUrl: string,\n  hintIssuers?: string[],\n): Promise<AuthorizationServerMetadata> { ... }"
+}

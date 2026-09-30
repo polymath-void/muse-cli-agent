@@ -1,0 +1,17 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "checkBin",
+        "hash": "01855940e56578ef27e3608c1a3ec9af38e94a9ead6f43c966f525c27d833953",
+        "file": "/home/Projects/muse-cli-agent/src/nodeos.ts",
+        "line_number": 20,
+        "calls": [
+            "trim",
+            "checkBin",
+            "join",
+            "spawnSync"
+        ]
+    },
+    "source": "export function checkBin(name: string): string | null {\n  const prefix = process.env.PREFIX ?? \"/data/data/com.termux/files/usr\";\n  const candidates = [\n    path.join(prefix, \"bin\", name),\n    `/usr/bin/${name}`,\n    name,\n  ];\n  for (const c of candidates) {\n    try {\n      const r = spawnSync(c, [\"--version\"], { stdio: \"ignore\" });\n      if (r.status === 0 || r.error === undefined) return c;\n    } catch {\n      continue;\n    }\n    // Fallback: `command -v`.\n    try {\n      const r = spawnSync(\"sh\", [\"-c\", `command -v ${name}`], { encoding: \"utf-8\" });\n      if (r.status === 0 && r.stdout.trim().length > 0) return r.stdout.trim();\n    } catch {\n      continue;\n    }\n  }\n  return null;\n}",
+    "skeleton": "export function checkBin(name: string): string | null { ... }"
+}

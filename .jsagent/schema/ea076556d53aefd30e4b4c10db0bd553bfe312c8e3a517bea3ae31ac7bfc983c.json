@@ -1,0 +1,17 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "joinUrl",
+        "hash": "ea076556d53aefd30e4b4c10db0bd553bfe312c8e3a517bea3ae31ac7bfc983c",
+        "file": "/home/Projects/muse-cli-agent/src/auth.ts",
+        "line_number": 374,
+        "calls": [
+            "startsWith",
+            "test",
+            "joinUrl",
+            "replace"
+        ]
+    },
+    "source": "function joinUrl(base: string, p: string): string {\n  if (/^https?:\\/\\//i.test(p)) return p;\n  const b = base.replace(/\\/+$/, \"\");\n  const suffix = p.startsWith(\"/\") ? p : `/${p}`;\n  return b + suffix;\n}",
+    "skeleton": "function joinUrl(base: string, p: string): string { ... }"
+}

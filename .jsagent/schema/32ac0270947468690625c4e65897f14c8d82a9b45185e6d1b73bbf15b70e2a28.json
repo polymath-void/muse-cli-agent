@@ -1,0 +1,14 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "slashChoices",
+        "hash": "32ac0270947468690625c4e65897f14c8d82a9b45185e6d1b73bbf15b70e2a28",
+        "file": "/home/Projects/muse-cli-agent/src/tui.ts",
+        "line_number": 713,
+        "calls": [
+            "slashChoices"
+        ]
+    },
+    "source": "function slashChoices(cmds: SlashCommand[] = SLASH_COMMANDS): { name: string; value: string }",
+    "skeleton": "function slashChoices(cmds: SlashCommand[] = SLASH_COMMANDS): { ... }"
+}

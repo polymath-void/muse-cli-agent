@@ -1,0 +1,14 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "parseSlashInput",
+        "hash": "4b70678b83f5a8301338d3a0328f0862cdbbdfb3458c39f8338ba88b0ff0bed8",
+        "file": "/home/Projects/muse-cli-agent/src/tui.ts",
+        "line_number": 692,
+        "calls": [
+            "parseSlashInput"
+        ]
+    },
+    "source": "export function parseSlashInput(text: string): { command: string; arg: string }",
+    "skeleton": "export function parseSlashInput(text: string): { ... }"
+}

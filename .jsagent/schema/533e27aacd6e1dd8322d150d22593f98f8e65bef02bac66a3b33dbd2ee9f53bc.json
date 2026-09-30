@@ -1,0 +1,14 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "pollDeviceToken",
+        "hash": "533e27aacd6e1dd8322d150d22593f98f8e65bef02bac66a3b33dbd2ee9f53bc",
+        "file": "/home/Projects/muse-cli-agent/src/auth.ts",
+        "line_number": 578,
+        "calls": [
+            "pollDeviceToken"
+        ]
+    },
+    "source": "export async function pollDeviceToken(\n  tokenEndpoint: string,\n  clientId: string,\n  deviceCode: string,\n  opts: {\n    intervalSec?: number;\n    expiresInSec?: number;\n    clientSecret?: string;\n    onPending?: (elapsedSec: number, intervalSec: number) => void;\n    signal?: AbortSignal;\n  }",
+    "skeleton": "export async function pollDeviceToken(\n  tokenEndpoint: string,\n  clientId: string,\n  deviceCode: string,\n  opts: { ... }"
+}

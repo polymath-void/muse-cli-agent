@@ -1,0 +1,14 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "registerClient",
+        "hash": "a8e42933234122ae950e82d5ceec0b61cc872185646edcbfad1c67569ef5e143",
+        "file": "/home/Projects/muse-cli-agent/src/auth.ts",
+        "line_number": 478,
+        "calls": [
+            "registerClient"
+        ]
+    },
+    "source": "export async function registerClient(\n  registrationEndpoint: string,\n  opts: { redirectUri?: string }",
+    "skeleton": "export async function registerClient(\n  registrationEndpoint: string,\n  opts: { ... }"
+}

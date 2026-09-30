@@ -1,0 +1,14 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "logout",
+        "hash": "d670d923e4c762520066afb4e0ec358c3e6e81c773a43a075cdab171fb1b6321",
+        "file": "/home/Projects/muse-cli-agent/src/auth.ts",
+        "line_number": 944,
+        "calls": [
+            "logout"
+        ]
+    },
+    "source": "export async function logout(opts: {\n  revoke?: boolean;\n  authBaseUrl?: string;\n  authPath?: string;\n}",
+    "skeleton": "export async function logout(opts: { ... }"
+}

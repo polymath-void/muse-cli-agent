@@ -1,0 +1,14 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "credentialSummary",
+        "hash": "e222f191761ff0b102065b469650a8bdf793e7b17105064cc55e512e320127bd",
+        "file": "/home/Projects/muse-cli-agent/src/auth.ts",
+        "line_number": 293,
+        "calls": [
+            "credentialSummary"
+        ]
+    },
+    "source": "export function credentialSummary(authPath?: string): {\n  loggedIn: boolean;\n  source: string | null;\n  baseUrl: string | null;\n  userEmail: string | null;\n  obtainedVia: string | null;\n  hasRefreshToken: boolean;\n  expiresAt: number | null;\n}",
+    "skeleton": "export function credentialSummary(authPath?: string): { ... }"
+}

@@ -1,0 +1,19 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "appendXdgHistory",
+        "hash": "b39fa72ebdbb5d23f7465de1564594387a21543f565eb7d1481a297f2c1972ea",
+        "file": "/home/Projects/muse-cli-agent/src/tui.ts",
+        "line_number": 633,
+        "calls": [
+            "stringify",
+            "appendXdgHistory",
+            "mkdirSync",
+            "join",
+            "homedir",
+            "appendFileSync"
+        ]
+    },
+    "source": "export function appendXdgHistory(text: string): void {\n  try {\n    const dir = path.join(os.homedir(), \".local\", \"share\", \"muse\");\n    fs.mkdirSync(dir, { recursive: true });\n    fs.appendFileSync(\n      path.join(dir, \"tui-history.jsonl\"),\n      JSON.stringify(text) + \"\\n\",\n      \"utf-8\",\n    );\n  } catch {\n    /* ignore */\n  }\n}",
+    "skeleton": "export function appendXdgHistory(text: string): void { ... }"
+}

@@ -1,0 +1,20 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "readWorkflowPending",
+        "hash": "6948f8a3c1ade05e096df690a54406aa5c676406c3a1efabb4419af099bc062c",
+        "file": "/home/Projects/muse-cli-agent/src/tui.ts",
+        "line_number": 647,
+        "calls": [
+            "String",
+            "readFileSync",
+            "join",
+            "readWorkflowPending",
+            "slice",
+            "fine",
+            "parse"
+        ]
+    },
+    "source": "function readWorkflowPending(workspace: string): string | null {\n  try {\n    const raw = fs.readFileSync(path.join(workspace, \"workflow.json\"), \"utf-8\");\n    const data = JSON.parse(raw) as { status?: string; intent?: string; task?: string };\n    if (data && typeof data === \"object\") {\n      const status = String(data.status ?? \"unknown\");\n      if (status === \"pending\" || status === \"running\") {\n        return `${status}: ${String(data.intent ?? data.task ?? \"\").slice(0, 160)}`;\n      }\n      return `status=${status}`;\n    }\n  } catch {\n    /* no workflow.json in this CWD \u2014 fine (dynamic binding) */\n  }\n  return null;\n}",
+    "skeleton": "function readWorkflowPending(workspace: string): string | null { ... }"
+}

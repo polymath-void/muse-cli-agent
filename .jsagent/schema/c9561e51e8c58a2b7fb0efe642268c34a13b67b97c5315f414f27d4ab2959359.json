@@ -1,0 +1,14 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "runServe",
+        "hash": "c9561e51e8c58a2b7fb0efe642268c34a13b67b97c5315f414f27d4ab2959359",
+        "file": "/home/Projects/muse-cli-agent/src/index.ts",
+        "line_number": 257,
+        "calls": [
+            "runServe"
+        ]
+    },
+    "source": "async function runServe(opts: {\n  noSessionLog?: boolean;\n  disableWrite?: boolean;\n  disableShell?: boolean;\n  trustWorkspace?: boolean;\n}",
+    "skeleton": "async function runServe(opts: { ... }"
+}

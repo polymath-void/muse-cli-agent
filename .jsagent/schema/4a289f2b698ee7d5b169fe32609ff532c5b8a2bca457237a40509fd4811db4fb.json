@@ -1,0 +1,22 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "readAllStdin",
+        "hash": "4a289f2b698ee7d5b169fe32609ff532c5b8a2bca457237a40509fd4811db4fb",
+        "file": "/home/Projects/muse-cli-agent/src/auth.ts",
+        "line_number": 1007,
+        "calls": [
+            "readAllStdin",
+            "on",
+            "stdin",
+            "AuthError",
+            "reject",
+            "setEncoding",
+            "destroy",
+            "Promise",
+            "resolve"
+        ]
+    },
+    "source": "function readAllStdin(): Promise<string> {\n  return new Promise((resolve, reject) => {\n    if (process.stdin.isTTY) {\n      reject(\n        new AuthError(\n          \"stdin_required\",\n          \"API key must be piped via --api-key-stdin (never passed on the command line)\",\n        ),\n      );\n      return;\n    }\n    let data = \"\";\n    process.stdin.setEncoding(\"utf-8\");\n    process.stdin.on(\"data\", (chunk) => {\n      data += chunk;\n      if (data.length > 64 * 1024) {\n        reject(new AuthError(\"key_too_large\", \"stdin API key exceeds 64 KiB\"));\n        process.stdin.destroy();\n      }\n    });\n    process.stdin.on(\"end\", () => resolve(data));\n    process.stdin.on(\"error\", (e) => reject(e));\n  });\n}",
+    "skeleton": "function readAllStdin(): Promise<string> { ... }"
+}

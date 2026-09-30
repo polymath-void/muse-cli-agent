@@ -1,0 +1,14 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "normaliseServerMetadata",
+        "hash": "2fa9776316c87f76fdb31e6d9895f53ffbd1e4303f15b2670200ed7f14984309",
+        "file": "/home/Projects/muse-cli-agent/src/auth.ts",
+        "line_number": 459,
+        "calls": [
+            "normaliseServerMetadata"
+        ]
+    },
+    "source": "function normaliseServerMetadata(\n  meta: AuthorizationServerMetadata,\n  base: string,\n): AuthorizationServerMetadata {\n  const out: AuthorizationServerMetadata = { ...meta };\n  // Fill device endpoints when the server omits them but follows Meta paths.\n  if (!out.device_authorization_endpoint) {\n    out.device_authorization_endpoint = `${base}/oidc/device/authorization/`;\n  }\n  if (!out.token_endpoint) {\n    out.token_endpoint = `${base}/oidc/device/token/`;\n  }\n  return out;\n}",
+    "skeleton": "function normaliseServerMetadata(\n  meta: AuthorizationServerMetadata,\n  base: string,\n): AuthorizationServerMetadata { ... }"
+}

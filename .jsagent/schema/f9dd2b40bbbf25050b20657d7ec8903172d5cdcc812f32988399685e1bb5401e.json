@@ -1,0 +1,17 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "appendSessionLine",
+        "hash": "f9dd2b40bbbf25050b20657d7ec8903172d5cdcc812f32988399685e1bb5401e",
+        "file": "/home/Projects/muse-cli-agent/src/tui.ts",
+        "line_number": 618,
+        "calls": [
+            "stringify",
+            "appendSessionLine",
+            "appendFileSync",
+            "mkdirSync"
+        ]
+    },
+    "source": "export function appendSessionLine(\n  session: SessionInfo,\n  record: Record<string, unknown>,\n  noLog = false,\n): void {\n  if (noLog || !session.sessionFile) return;\n  try {\n    fs.mkdirSync(session.sessionDir, { recursive: true });\n    fs.appendFileSync(session.sessionFile, JSON.stringify(record) + \"\\n\", \"utf-8\");\n  } catch {\n    /* session logging must never crash the TUI */\n  }\n}",
+    "skeleton": "export function appendSessionLine(\n  session: SessionInfo,\n  record: Record<string, unknown>,\n  noLog = false,\n): void { ... }"
+}

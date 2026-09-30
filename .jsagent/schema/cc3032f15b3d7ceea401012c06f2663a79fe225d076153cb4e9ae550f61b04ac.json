@@ -1,0 +1,15 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "parseApproval",
+        "hash": "cc3032f15b3d7ceea401012c06f2663a79fe225d076153cb4e9ae550f61b04ac",
+        "file": "/home/Projects/muse-cli-agent/src/index.ts",
+        "line_number": 430,
+        "calls": [
+            "Error",
+            "parseApproval"
+        ]
+    },
+    "source": "function parseApproval(v: string): ApprovalMode {\n  if (v === \"untrusted\" || v === \"on-request\" || v === \"never\") return v;\n  throw new Error(`invalid approval mode: ${v}`);\n}",
+    "skeleton": "function parseApproval(v: string): ApprovalMode { ... }"
+}

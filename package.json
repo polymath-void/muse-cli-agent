@@ -1,0 +1,55 @@
+{
+  "name": "muse-cli-agent",
+  "version": "1.0.0",
+  "description": "Native TypeScript CLI coding assistant supporting Meta Device Flow, Agent TUI, Headless exec, and JSON-RPC bridging.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "bin": {
+    "muse-ts": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "start": "node ./dist/index.js",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"tests/*.test.mjs\"",
+    "login": "tsx src/index.ts login",
+    "status": "tsx src/index.ts status",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "muse",
+    "meta",
+    "cli",
+    "agent",
+    "tui",
+    "device-flow",
+    "ai",
+    "copilot"
+  ],
+  "author": "Antigravity Architecture Group",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/polymath-void/muse-cli-agent.git"
+  },
+  "engines": {
+    "node": ">= 18.0.0"
+  },
+  "dependencies": {
+    "chalk": "^6.0.1",
+    "commander": "^15.0.0",
+    "inquirer": "^14.2.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.0",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.2"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  }
+}

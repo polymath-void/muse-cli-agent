@@ -1,0 +1,16 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "resolveAuthPath",
+        "hash": "e4b2be96a75b8275fa835aa156e03ea584a62919da3f8b936d06b4a8537c9990",
+        "file": "/home/Projects/muse-cli-agent/src/auth.ts",
+        "line_number": 195,
+        "calls": [
+            "resolveAuthPath",
+            "homedir",
+            "join"
+        ]
+    },
+    "source": "export function resolveAuthPath(): string {\n  const xdg =\n    process.env.XDG_CONFIG_HOME && process.env.XDG_CONFIG_HOME.length > 0\n      ? process.env.XDG_CONFIG_HOME\n      : path.join(os.homedir(), \".config\");\n  return path.join(xdg, \"muse\", \"auth.json\");\n}",
+    "skeleton": "export function resolveAuthPath(): string { ... }"
+}

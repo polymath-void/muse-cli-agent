@@ -1,0 +1,15 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "AuthError",
+        "hash": "05e6d0cdfde49f8c6af76afbaf023bd45cd5d2672c16a491e82e9f46dbd38dc2",
+        "file": "/home/Projects/muse-cli-agent/src/auth.ts",
+        "line_number": 180,
+        "calls": [
+            "super",
+            "constructor"
+        ]
+    },
+    "source": "export class AuthError extends Error {\n  code: string;\n  hint?: string;\n  constructor(code: string, message: string, hint?: string) {\n    super(message);\n    this.name = \"AuthError\";\n    this.code = code;\n    this.hint = hint;\n  }\n}",
+    "skeleton": "export class AuthError extends Error { ... }"
+}

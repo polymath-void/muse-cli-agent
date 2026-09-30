@@ -1,0 +1,17 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "resolveCredential",
+        "hash": "d2bd0eb153f1c15ec6a409a6427589b5fd49ca7010e93752c1ea6e405a0a9d17",
+        "file": "/home/Projects/muse-cli-agent/src/auth.ts",
+        "line_number": 267,
+        "calls": [
+            "getMetaAuth",
+            "loadAuthFile",
+            "resolveCredential",
+            "trim"
+        ]
+    },
+    "source": "export function resolveCredential(authPath?: string): CredentialResolution | null {\n  const envKey = (process.env.META_API_KEY ?? \"\").trim();\n  if (envKey.length > 0) {\n    return {\n      token: envKey,\n      source: \"env:META_API_KEY\",\n      baseUrl: process.env.MUSE_API_BASE_URL ?? DEFAULT_API_BASE_URL,\n    };\n  }\n  const meta = getMetaAuth(loadAuthFile(authPath));\n  if (!meta) return null;\n  const baseUrl = meta.api_base_url?.trim() || DEFAULT_API_BASE_URL;\n  if (meta.api_key && meta.api_key.trim().length > 0) {\n    return { token: meta.api_key.trim(), source: \"auth.json:api_key\", baseUrl, meta };\n  }\n  if (meta.access_token && meta.access_token.trim().length > 0) {\n    return {\n      token: meta.access_token.trim(),\n      source: \"auth.json:access_token\",\n      baseUrl,\n      meta,\n    };\n  }\n  return null;\n}",
+    "skeleton": "export function resolveCredential(authPath?: string): CredentialResolution | null { ... }"
+}

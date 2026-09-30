@@ -1,0 +1,14 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "runTui",
+        "hash": "aa0ffcb235098b515844445d7d821d64e28be79166296f602113b6e165292ad2",
+        "file": "/home/Projects/muse-cli-agent/src/tui.ts",
+        "line_number": 824,
+        "calls": [
+            "runTui"
+        ]
+    },
+    "source": "export async function runTui(opts: TuiOptions = {}",
+    "skeleton": "export async function runTui(opts: TuiOptions = { ... }"
+}

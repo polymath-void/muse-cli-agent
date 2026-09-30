@@ -1,0 +1,15 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "getMetaAuth",
+        "hash": "08fdfbc0788fba2973b4aba4d89fb9da79497bb079a259912dba65396e30cd5b",
+        "file": "/home/Projects/muse-cli-agent/src/auth.ts",
+        "line_number": 244,
+        "calls": [
+            "loadAuthFile",
+            "getMetaAuth"
+        ]
+    },
+    "source": "export function getMetaAuth(auth?: AuthFile): MetaProviderAuth | undefined {\n  const file = auth ?? loadAuthFile();\n  return file.providers[\"meta\"];\n}",
+    "skeleton": "export function getMetaAuth(auth?: AuthFile): MetaProviderAuth | undefined { ... }"
+}

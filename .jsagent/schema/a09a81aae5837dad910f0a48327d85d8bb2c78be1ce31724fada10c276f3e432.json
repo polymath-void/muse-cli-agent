@@ -1,0 +1,17 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "loadAuthFile",
+        "hash": "a09a81aae5837dad910f0a48327d85d8bb2c78be1ce31724fada10c276f3e432",
+        "file": "/home/Projects/muse-cli-agent/src/auth.ts",
+        "line_number": 203,
+        "calls": [
+            "parse",
+            "resolveAuthPath",
+            "loadAuthFile",
+            "readFileSync"
+        ]
+    },
+    "source": "export function loadAuthFile(authPath?: string): AuthFile {\n  const p = authPath ?? resolveAuthPath();\n  try {\n    const raw = fs.readFileSync(p, \"utf-8\");\n    const data = JSON.parse(raw) as AuthFile;\n    if (\n      typeof data !== \"object\" ||\n      data === null ||\n      typeof data.schema_version !== \"number\" ||\n      typeof data.providers !== \"object\" ||\n      data.providers === null\n    ) {\n      return { schema_version: AUTH_JSON_SCHEMA_VERSION, providers: {} };\n    }\n    return data;\n  } catch {\n    return { schema_version: AUTH_JSON_SCHEMA_VERSION, providers: {} };\n  }\n}",
+    "skeleton": "export function loadAuthFile(authPath?: string): AuthFile { ... }"
+}

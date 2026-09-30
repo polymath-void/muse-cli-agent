@@ -1,0 +1,22 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "saveAuthFile",
+        "hash": "312061ead9a5f21ef8b5d7e0465d3961ccf06be997aec4652235fac18c522f63",
+        "file": "/home/Projects/muse-cli-agent/src/auth.ts",
+        "line_number": 224,
+        "calls": [
+            "stringify",
+            "mkdirSync",
+            "writeFileSync",
+            "dirname",
+            "resolveAuthPath",
+            "saveAuthFile",
+            "renameSync",
+            "parse",
+            "chmodSync"
+        ]
+    },
+    "source": "export function saveAuthFile(auth: AuthFile, authPath?: string): string {\n  const p = authPath ?? resolveAuthPath();\n  fs.mkdirSync(path.dirname(p), { recursive: true, mode: 0o700 });\n  // Drop undefined values to match Rust skip_serializing_if behaviour.\n  const cleaned = JSON.parse(JSON.stringify(auth)) as AuthFile;\n  cleaned.schema_version = AUTH_JSON_SCHEMA_VERSION;\n  const tmp = `${p}.tmp.${process.pid}`;\n  fs.writeFileSync(tmp, JSON.stringify(cleaned, null, 2) + \"\\n\", {\n    encoding: \"utf-8\",\n    mode: 0o600,\n  });\n  try {\n    fs.chmodSync(tmp, 0o600);\n  } catch {\n    /* best-effort on odd filesystems */\n  }\n  fs.renameSync(tmp, p);\n  return p;\n}",
+    "skeleton": "export function saveAuthFile(auth: AuthFile, authPath?: string): string { ... }"
+}

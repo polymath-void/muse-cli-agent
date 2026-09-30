@@ -1,0 +1,17 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "readJsonBounded",
+        "hash": "562a71300652b5c1b346bffd7eae89483a0bc0cd97f85f5c18d7372968c4427b",
+        "file": "/home/Projects/muse-cli-agent/src/auth.ts",
+        "line_number": 356,
+        "calls": [
+            "text",
+            "JSON",
+            "parse",
+            "AuthError"
+        ]
+    },
+    "source": "async function readJsonBounded<T>(res: Response): Promise<T> {\n  const text = await res.text();\n  if (text.length > OAUTH_SIZE_BOUND_BYTES) {\n    throw new AuthError(\n      \"oauth_size_bound\",\n      \"response body exceeds the OAuth size bound\",\n    );\n  }\n  try {\n    return JSON.parse(text) as T;\n  } catch {\n    throw new AuthError(\n      \"invalid_json\",\n      `endpoint returned non-JSON (HTTP ${res.status})`,\n    );\n  }\n}",
+    "skeleton": "async function readJsonBounded<T>(res: Response): Promise<T> { ... }"
+}

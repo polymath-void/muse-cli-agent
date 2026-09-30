@@ -1,0 +1,16 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "parseEffort",
+        "hash": "425e26764b234170514ae45829501df1ec0a113dea117d870741f567bfb23389",
+        "file": "/home/Projects/muse-cli-agent/src/index.ts",
+        "line_number": 435,
+        "calls": [
+            "Error",
+            "includes",
+            "parseEffort"
+        ]
+    },
+    "source": "function parseEffort(v: string): ReasoningEffort {\n  const levels = [\"none\", \"minimal\", \"low\", \"medium\", \"high\", \"xhigh\", \"max\", \"ultra\"];\n  if ((levels as string[]).includes(v)) return v as ReasoningEffort;\n  throw new Error(`invalid reasoning effort: ${v}`);\n}",
+    "skeleton": "function parseEffort(v: string): ReasoningEffort { ... }"
+}

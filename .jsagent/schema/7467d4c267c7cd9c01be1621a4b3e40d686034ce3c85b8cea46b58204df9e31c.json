@@ -1,0 +1,22 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "renderAssistant",
+        "hash": "7467d4c267c7cd9c01be1621a4b3e40d686034ce3c85b8cea46b58204df9e31c",
+        "file": "/home/Projects/muse-cli-agent/src/tui.ts",
+        "line_number": 804,
+        "calls": [
+            "white",
+            "renderAssistant",
+            "trimStart",
+            "test",
+            "dim",
+            "join",
+            "split",
+            "map",
+            "startsWith"
+        ]
+    },
+    "source": "export function renderAssistant(text: string): string {\n  const lines = text.split(\"\\n\");\n  let inFence = false;\n  return lines\n    .map((ln) => {\n      if (ln.trimStart().startsWith(\"```\")) {\n        inFence = !inFence;\n        return chalk.dim(ln);\n      }\n      if (inFence) return chalk.dim(ln);\n      if (/^#{1,4}\\s/.test(ln)) return chalk.bold.white(ln);\n      return ln;\n    })\n    .join(\"\\n\");\n}",
+    "skeleton": "export function renderAssistant(text: string): string { ... }"
+}

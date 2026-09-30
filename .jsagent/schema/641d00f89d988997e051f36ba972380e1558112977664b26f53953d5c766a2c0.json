@@ -1,0 +1,19 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "filterSlashCommands",
+        "hash": "641d00f89d988997e051f36ba972380e1558112977664b26f53953d5c766a2c0",
+        "file": "/home/Projects/muse-cli-agent/src/tui.ts",
+        "line_number": 705,
+        "calls": [
+            "includes",
+            "filter",
+            "replace",
+            "trim",
+            "toLowerCase",
+            "filterSlashCommands"
+        ]
+    },
+    "source": "export function filterSlashCommands(term: string): SlashCommand[] {\n  const q = term.trim().toLowerCase().replace(/^\\/+/, \"\");\n  if (!q) return [...SLASH_COMMANDS];\n  return SLASH_COMMANDS.filter(\n    (c) => c.name.includes(q) || c.description.toLowerCase().includes(q),\n  );\n}",
+    "skeleton": "export function filterSlashCommands(term: string): SlashCommand[] { ... }"
+}

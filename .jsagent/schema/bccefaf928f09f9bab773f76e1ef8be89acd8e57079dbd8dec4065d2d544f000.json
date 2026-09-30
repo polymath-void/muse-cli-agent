@@ -1,0 +1,18 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "revokeToken",
+        "hash": "bccefaf928f09f9bab773f76e1ef8be89acd8e57079dbd8dec4065d2d544f000",
+        "file": "/home/Projects/muse-cli-agent/src/auth.ts",
+        "line_number": 699,
+        "calls": [
+            "set",
+            "fetchBounded",
+            "revokeToken",
+            "URLSearchParams",
+            "toString"
+        ]
+    },
+    "source": "export async function revokeToken(\n  revocationEndpoint: string,\n  token: string,\n  clientId?: string,\n): Promise<void> {\n  const form = new URLSearchParams();\n  form.set(\"token\", token);\n  if (clientId) form.set(\"client_id\", clientId);\n  try {\n    await fetchBounded(revocationEndpoint, {\n      method: \"POST\",\n      headers: { \"content-type\": \"application/x-www-form-urlencoded\" },\n      body: form.toString(),\n      timeoutMs: 10_000,\n    });\n  } catch {\n    // Revocation is best-effort; local logout proceeds regardless.\n  }\n}",
+    "skeleton": "export async function revokeToken(\n  revocationEndpoint: string,\n  token: string,\n  clientId?: string,\n): Promise<void> { ... }"
+}

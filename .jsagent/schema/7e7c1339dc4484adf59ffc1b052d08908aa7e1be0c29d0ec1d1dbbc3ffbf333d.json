@@ -1,0 +1,14 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "authSetApiKeyFromStdin",
+        "hash": "7e7c1339dc4484adf59ffc1b052d08908aa7e1be0c29d0ec1d1dbbc3ffbf333d",
+        "file": "/home/Projects/muse-cli-agent/src/auth.ts",
+        "line_number": 972,
+        "calls": [
+            "authSetApiKeyFromStdin"
+        ]
+    },
+    "source": "export async function authSetApiKeyFromStdin(opts: {\n  provider?: string;\n  apiBaseUrl?: string;\n  authPath?: string;\n}",
+    "skeleton": "export async function authSetApiKeyFromStdin(opts: { ... }"
+}

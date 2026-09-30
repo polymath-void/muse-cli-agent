@@ -1,0 +1,21 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "refreshStoredGrant",
+        "hash": "8eae7ba6934de8e5c0286f1ded834905e068469632e6a70638836758d8437de2",
+        "file": "/home/Projects/muse-cli-agent/src/auth.ts",
+        "line_number": 921,
+        "calls": [
+            "discoverAuthorizationServer",
+            "refreshAccessToken",
+            "replace",
+            "now",
+            "floor",
+            "saveAuthFile",
+            "refreshStoredGrant",
+            "loadAuthFile"
+        ]
+    },
+    "source": "export async function refreshStoredGrant(\n  authBaseUrl?: string,\n  authPath?: string,\n): Promise<MetaProviderAuth | null> {\n  const file = loadAuthFile(authPath);\n  const meta = file.providers[\"meta\"];\n  if (!meta?.refresh_token) return null;\n  const authBase = (authBaseUrl ?? DEFAULT_AUTH_BASE_URL).replace(/\\/+$/, \"\");\n  const server = await discoverAuthorizationServer(authBase);\n  if (!server.token_endpoint || !meta.client_id) return null;\n  const token = await refreshAccessToken(\n    server.token_endpoint,\n    meta.client_id,\n    meta.refresh_token,\n  );\n  const nowSec = Math.floor(Date.now() / 1000);\n  meta.access_token = token.access_token;\n  if (token.refresh_token) meta.refresh_token = token.refresh_token;\n  if (token.expires_in) meta.expires_at = nowSec + token.expires_in;\n  saveAuthFile(file, authPath);\n  return meta;\n}",
+    "skeleton": "export async function refreshStoredGrant(\n  authBaseUrl?: string,\n  authPath?: string,\n): Promise<MetaProviderAuth | null> { ... }"
+}

@@ -1,0 +1,16 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "sleep",
+        "hash": "efc4dd325f33bd7ada0aa0955b7d8bdc96b39eafc98820ce9c412b19bf93aeed",
+        "file": "/home/Projects/muse-cli-agent/src/auth.ts",
+        "line_number": 1003,
+        "calls": [
+            "sleep",
+            "Promise",
+            "setTimeout"
+        ]
+    },
+    "source": "function sleep(ms: number): Promise<void> {\n  return new Promise((resolve) => setTimeout(resolve, ms));\n}",
+    "skeleton": "function sleep(ms: number): Promise<void> { ... }"
+}

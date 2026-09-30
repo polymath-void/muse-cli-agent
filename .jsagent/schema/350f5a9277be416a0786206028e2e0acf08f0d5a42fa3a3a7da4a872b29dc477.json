@@ -1,0 +1,20 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "promptSlashMenu",
+        "hash": "350f5a9277be416a0786206028e2e0acf08f0d5a42fa3a3a7da4a872b29dc477",
+        "file": "/home/Projects/muse-cli-agent/src/tui.ts",
+        "line_number": 726,
+        "calls": [
+            "async",
+            "trim",
+            "slashChoices",
+            "filterSlashCommands",
+            "max",
+            "promptSlashMenu",
+            "min"
+        ]
+    },
+    "source": "export async function promptSlashMenu(initialFilter?: string): Promise<string | null> {\n  const hint = initialFilter?.trim() ? ` (filter: ${initialFilter.trim()})` : \"\";\n  try {\n    const { cmd } = await inquirer.prompt<{ cmd: string }>([\n      {\n        type: \"search\",\n        name: \"cmd\",\n        message: `slash command${hint}`,\n        source: async (term: string | undefined) => {\n          const q = term ?? initialFilter ?? \"\";\n          const matches = filterSlashCommands(q);\n          if (matches.length > 0) return slashChoices(matches);\n          return slashChoices();\n        },\n      } as unknown as { type: string; name: string; message: string },\n    ]);\n    return typeof cmd === \"string\" && cmd.length > 0 ? cmd : null;\n  } catch {\n    /* search unavailable or dismissed \u2014 fall back to a plain list */\n  }\n  try {\n    const prefiltered = filterSlashCommands(initialFilter ?? \"\");\n    const { cmd } = await inquirer.prompt<{ cmd: string }>([\n      {\n        type: \"select\",\n        name: \"cmd\",\n        message: `slash command${hint}`,\n        choices: slashChoices(prefiltered.length > 0 ? prefiltered : SLASH_COMMANDS),\n        pageSize: Math.min(Math.max(SLASH_COMMANDS.length, 8), 16),\n      },\n    ]);\n    return typeof cmd === \"string\" && cmd.length > 0 ? cmd : null;\n  } catch {\n    return null;\n  }\n}",
+    "skeleton": "export async function promptSlashMenu(initialFilter?: string): Promise<string | null> { ... }"
+}

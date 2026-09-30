@@ -1,0 +1,14 @@
+{
+    "metadata": {
+        "type": "JS_Node",
+        "name": "fetchBounded",
+        "hash": "2e7c907205da6bb3bb59d3af73dd8aecd84b453052b08948d7faa1f4ce889db3",
+        "file": "/home/Projects/muse-cli-agent/src/auth.ts",
+        "line_number": 329,
+        "calls": [
+            "fetchBounded"
+        ]
+    },
+    "source": "async function fetchBounded(\n  url: string,\n  init: RequestInit & { timeoutMs?: number }",
+    "skeleton": "async function fetchBounded(\n  url: string,\n  init: RequestInit & { ... }"
+}
