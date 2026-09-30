@@ -651,9 +651,21 @@ export async function main(argv: string[] = process.argv): Promise<void> {
           "Use tools immediately without asking questions. Do NOT greet or chit-chat. " +
           "Scope all file operations to the workspace directory. Never scan the whole filesystem. " +
           "Complete the task in as few steps as possible, then stop.";
+
+        // Expand inline mentions (@file / @project / @skill)
+        let execPrompt = prompt;
+        try {
+          const { MentionNano } = await import("./services/mentions.js");
+          const mentionNano = new MentionNano(workspace);
+          const mx = mentionNano.expand(prompt);
+          if (mx.contextBlock) execPrompt = mx.expanded;
+        } catch (err) {
+          if (!cmdOpts.json) console.log(chalk.red(`mention expand failed: ${(err as Error).message}`));
+        }
+
         let messages: ChatMessage[] = [
           { role: "system", content: execSystemPrompt },
-          { role: "user", content: prompt },
+          { role: "user", content: execPrompt },
         ];
         
         emit({ type: "turn_start", model: client.model });
