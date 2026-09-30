@@ -109,3 +109,32 @@ describe("startup header", () => {
     assert.match(out, /Type \/ for commands/);
   });
 });
+
+describe("companion slash (P1 advanced layer)", () => {
+  it("registers /tasks and /memory in SLASH_COMMANDS", async () => {
+    const { SLASH_COMMANDS } = await import("../dist/tui.js");
+    const names = SLASH_COMMANDS.map((c) => c.name);
+    assert.ok(names.includes("tasks"), "SLASH_COMMANDS must include tasks");
+    assert.ok(names.includes("memory"), "SLASH_COMMANDS must include memory");
+    const tasks = SLASH_COMMANDS.find((c) => c.name === "tasks");
+    assert.match(tasks.usage, /\/tasks/);
+    const mem = SLASH_COMMANDS.find((c) => c.name === "memory");
+    assert.match(mem.usage, /\/memory/);
+  });
+
+
+  it("companion bridge loads tasks + memory CWD-bound", async () => {
+    const { loadTasks, addTask, readMemory, appendMemory, nextTasks } = await import("../dist/companion/index.js");
+    addTask("test seeded task", "P1", process.cwd());
+    appendMemory("muse-ai seeded mem", process.cwd());
+    
+    const tasks = loadTasks(process.cwd());
+    assert.ok(Array.isArray(tasks));
+    assert.ok(tasks.length > 0, "expected seeded .muse/tasks.json");
+
+    const next = nextTasks(process.cwd(), 5);
+    assert.ok(next.every((t) => t.status !== "done"));
+    const mem = readMemory(process.cwd());
+    assert.match(mem, /muse-ai/);
+  });
+});

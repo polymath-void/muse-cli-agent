@@ -21,12 +21,12 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import inquirer from "inquirer";
-import { search, select } from "@inquirer/prompts";
+import { search, select, input, editor } from "@inquirer/prompts";
 import chalk from "chalk";
 import { resolveCredential, DEFAULT_API_BASE_URL } from "./auth.js";
 import { runInit } from "./nodeos.js";
 import { NanoRegistry, FsNano, MentionNano, PluginNano, PermissionNano, SessionNano } from "./services/index.js";
+import { loadTasks, addTask, setTaskStatus, nextTasks, readMemory, appendMemory } from "./companion/index.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -670,6 +670,8 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   { name: "project", description: "attach @project context into this turn", usage: "/project <name>" },
   { name: "skill", description: "attach @skill context into this turn", usage: "/skill <name>" },
   { name: "plugins", description: "list loaded plugins", usage: "/plugins" },
+  { name: "tasks", description: "list/add/done companion tasks", usage: "/tasks [list|add <title>|done <id>] [<args>]" },
+  { name: "memory", description: "show/append companion memory", usage: "/memory [note ...]" },
   { name: "exit", description: "leave the TUI", usage: "/exit" },
   { name: "quit", description: "leave the TUI (alias)", usage: "/quit" },
 ];
@@ -797,7 +799,10 @@ export function renderAssistant(text: string): string {
       }
       if (inFence) return chalk.dim(ln);
       if (/^#{1,4}\s/.test(ln)) return chalk.bold.white(ln);
-      return ln;
+      
+      let formatted = ln.replace(/\[([^\]]+)\]\(([^)]+)\)/g, chalk.bold.blue('[$1]') + chalk.dim('($2)'));
+      formatted = formatted.replace(/\*\*([^*]+)\*\*/g, chalk.bold('$1'));
+      return formatted;
     })
     .join("\n");
 }
@@ -914,16 +919,13 @@ export async function runTui(opts: TuiOptions = {}): Promise<void> {
       queuedInitial = null;
       console.log(promptColor("› ") + userText);
     } else {
+      console.log(); // Add a newline before asking for input to ensure clean prompt placement
       try {
-        const answer = await inquirer.prompt<{ q: string }>([
-          {
-            type: "input",
-            name: "q",
-            message: promptColor("›"),
-            prefix: "",
-          },
-        ]);
-        userText = (answer.q ?? "").trim();
+        userText = await input({
+          message: promptColor("›"),
+          theme: { prefix: "" }
+        });
+        userText = userText.trim();
       } catch {
         console.log(chalk.dim("\nbye."));
         break;
@@ -1082,9 +1084,7 @@ export async function runTui(opts: TuiOptions = {}): Promise<void> {
         continue;
       } else if (command === "editor") {
         try {
-          const { text } = await inquirer.prompt<{ text: string }>([
-            { type: "editor", name: "text", message: "prompt" },
-          ]);
+          const text = await editor({ message: "prompt" });
           if (text.trim().length > 0) {
             queuedInitial = text.trim();
           }
@@ -1142,6 +1142,58 @@ export async function runTui(opts: TuiOptions = {}): Promise<void> {
           if (ptools.length > 0) {
             console.log(chalk.bold("plugin tools:"));
             for (const tool of ptools) console.log(`  ${chalk.cyan(tool.name)} — ${tool.description ?? ""}`);
+          }
+        } catch (err) {
+          console.log(chalk.red((err as Error).message));
+        }
+        continue;
+      } else if (command === "tasks") {
+        // Companion tasks — CWD-bound .muse/tasks.json, P0-first.
+        try {
+          const parts = arg.split(/\s+/).filter(Boolean);
+          const sub = (parts[0] ?? "list").toLowerCase();
+          if (sub === "add") {
+            const title = arg.slice(3).trim() || parts.slice(1).join(" ").trim();
+            if (!title) {
+              console.log(chalk.red("usage: /tasks add <title>"));
+            } else {
+              const t = addTask(title, "P1", workspace);
+              console.log(chalk.green(`added ${t.id} — ${t.title}`));
+            }
+          } else if (sub === "done") {
+            const id = parts[1] ?? "";
+            if (!id) {
+              console.log(chalk.red("usage: /tasks done <id>"));
+            } else if (setTaskStatus(id, "done", workspace)) {
+              console.log(chalk.green(`done ${id}`));
+            } else {
+              console.log(chalk.red(`no task: ${id}`));
+            }
+          } else {
+            const items = sub === "next" ? nextTasks(workspace, 5) : loadTasks(workspace);
+            if (items.length === 0) {
+              console.log(chalk.dim("(no tasks — /tasks add <title>)"));
+            } else {
+              console.log(chalk.bold("tasks:"));
+              for (const t of items.slice(0, 20)) {
+                const mark = t.status === "done" ? chalk.green("x") : t.status === "in-progress" ? chalk.yellow("~") : chalk.dim(" ");
+                console.log(`  [${mark}] ${chalk.cyan(t.id)} ${chalk.dim(t.priority)} ${t.title.slice(0, 120)}`);
+              }
+            }
+          }
+        } catch (err) {
+          console.log(chalk.red((err as Error).message));
+        }
+        continue;
+      } else if (command === "memory") {
+        // Companion memory — CWD-bound .muse/memory.md, capped output.
+        try {
+          if (!arg) {
+            const mem = readMemory(workspace);
+            console.log(mem ? mem.slice(0, 4000) : chalk.dim("(no memory — /memory <note> to append)"));
+          } else {
+            appendMemory(arg.slice(0, 500), workspace);
+            console.log(chalk.green("noted."));
           }
         } catch (err) {
           console.log(chalk.red((err as Error).message));
