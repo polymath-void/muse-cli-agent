@@ -1,4 +1,4 @@
-#!/data/data/com.termux/files/usr/bin/env node
+#!/usr/bin/env node
 /**
  * src/index.ts — muse-ts: native TypeScript CLI coding assistant.
  *
