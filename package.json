@@ -18,6 +18,7 @@
     "test": "node --test \"tests/*.test.mjs\"",
     "login": "tsx src/index.ts login",
     "status": "tsx src/index.ts status",
+    "postinstall": "node scripts/postinstall.js || true",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
