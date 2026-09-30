@@ -1,0 +1,16 @@
+DO NOT USE ANY TOOLS.
+You are Muse. I am Antigravity. The user wants you to finalize the "Cognitive Enhancements Protocol" implementation plan so that it perfectly aligns with your codebase and preferences.
+
+Here is the current draft:
+1. Internal Thought Processing (`<thought>` tags rendered in TUI, stripped from `.muse/sessions` history to save tokens).
+2. Context/Session Management (A `ContextManager.compact` API, exposed via a `/session` slash command and a `manage_context` tool).
+3. Self-Learning Core (A layered `LEARNINGS.md` system, a `learn()` tool to explicitly remember mistakes, and a promotion engine to auto-generate `.muse/plugins/<skill>/SKILL.md` for highly-used rules).
+
+Please rewrite this into a detailed markdown Implementation Plan. 
+Use this exact format:
+## [Goal Description]
+## Proposed Changes
+(Group files by component. Use [NEW], [MODIFY], [DELETE] tags. Include brief code snippets/diffs for how you will implement the `<thought>` stripping in `src/tui.ts`, the `learn()` tool, etc.)
+## Verification Plan
+
+Output ONLY the raw markdown of the plan. No pleasantries.

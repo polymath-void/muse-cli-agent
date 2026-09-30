@@ -27,6 +27,9 @@ import { resolveCredential, DEFAULT_API_BASE_URL } from "./auth.js";
 import { runInit } from "./nodeos.js";
 import { NanoRegistry, FsNano, MentionNano, PluginNano, PermissionNano, SessionNano } from "./services/index.js";
 import { loadTasks, addTask, setTaskStatus, nextTasks, readMemory, appendMemory } from "./companion/index.js";
+import { extractThought, stripThought, sanitizeBeforeSave, truncateThought, THOUGHT_DIRECTIVE, LEARNING_DIRECTIVE } from "./core/thought.js";
+import { ContextManager } from "./core/context-manager.js";
+import { persistLesson, loadLearnings, learningsContextBlock, maybePromoteLessonToSkill, LEARN_CATEGORIES } from "./core/learnings.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -173,6 +176,36 @@ export const WORKSPACE_TOOL_DEFS: ToolDefinition[] = [
           max_matches: { type: "integer", default: 50 },
         },
         required: ["pattern"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "manage_context",
+      description: "Check token usage, compact, or clear session history. Actions: status shows token counts, compact summarizes stale turns, clear resets context.",
+      parameters: {
+        type: "object",
+        properties: {
+          action: { type: "string", description: "status|compact|clear", default: "status" },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "learn",
+      description: "Persist a durable lesson to LEARNINGS.md so future sessions remember mistakes, preferences, and patterns.",
+      parameters: {
+        type: "object",
+        properties: {
+          lesson: { type: "string", description: "Lesson text (min 10 chars)" },
+          scope: { type: "string", description: "project|global", default: "project" },
+          category: { type: "string", description: "mistake|preference|pattern", default: "pattern" },
+        },
+        required: ["lesson"],
       },
     },
   },
@@ -410,6 +443,13 @@ export class MetaChatClient {
 // Workspace tools (scoped to workspace root, approval-gated)
 // ---------------------------------------------------------------------------
 
+// Bound per-TUI-loop to the live conversation history (set by runTui).
+// executeToolCall reads it for manage_context status/compact/clear.
+export let contextManagerLive: ContextManager | null = null;
+export function bindContextManager(cm: ContextManager | null): void {
+  contextManagerLive = cm;
+}
+
 export class WorkspaceTools {
   readonly root: string;
   readonly fsNano: FsNano;
@@ -578,6 +618,41 @@ export class WorkspaceTools {
           .join("\n");
         return out;
       }
+      case "manage_context": {
+        const action = str(args.action, "status").toLowerCase();
+        if (action === "status") {
+          const live = contextManagerLive?.getStatus() ?? { messages: 0, estimatedTokens: 0, limit: 120000, needsCompaction: false, usageRatio: 0 };
+          return `context: ${live.messages} messages · ~${live.estimatedTokens} tokens (limit ${live.limit}, ${(live.usageRatio * 100).toFixed(1)}%) · compaction ${live.needsCompaction ? "recommended" : "not needed"}`;
+        }
+        if (action === "compact") {
+          if (!contextManagerLive) return "error: no live context manager in this scope";
+          const stale = contextManagerLive.getHistory().length;
+          await contextManagerLive.compact(async (turns) => ContextManager.fallbackSummary(turns));
+          const after = contextManagerLive.getStatus();
+          return `compacted ${stale} → ${after.messages} messages · ~${after.estimatedTokens} tokens`;
+        }
+        if (action === "clear") {
+          if (!contextManagerLive) return "error: no live context manager in this scope";
+          const removed = contextManagerLive.clear(true);
+          return `cleared ${removed} message(s); system prompt preserved`;
+        }
+        return "error: manage_context requires action=status|compact|clear";
+      }
+      case "learn": {
+        const lesson = str(args.lesson);
+        if (!lesson || lesson.trim().length < 10) return "error: learn requires `lesson` (min 10 chars)";
+        const scopeRaw = str(args.scope, "project").toLowerCase();
+        const scope = scopeRaw === "global" ? "global" : "project";
+        const catRaw = str(args.category, "pattern").toLowerCase();
+        const category = (["mistake", "preference", "pattern"] as string[]).includes(catRaw) ? catRaw as "mistake" | "preference" | "pattern" : "pattern";
+        try {
+          const msg = persistLesson({ lesson, scope, category, workspace: this.root });
+          const skillFile = maybePromoteLessonToSkill(lesson, this.root, 3);
+          return skillFile ? `${msg} (promoted to skill: ${skillFile})` : msg;
+        } catch (err) {
+          return `error: ${(err as Error).message}`;
+        }
+      }
       default:
         return `error: unknown tool: ${name}`;
     }
@@ -672,6 +747,8 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   { name: "plugins", description: "list loaded plugins", usage: "/plugins" },
   { name: "tasks", description: "list/add/done companion tasks", usage: "/tasks [list|add <title>|done <id>] [<args>]" },
   { name: "memory", description: "show/append companion memory", usage: "/memory [note ...]" },
+  { name: "session", description: "manage session context (status|compact|clear)", usage: "/session [status|compact|clear]" },
+  { name: "learn", description: "persist a durable lesson", usage: "/learn [--global] [--mistake|--preference|--pattern] <lesson>" },
   { name: "exit", description: "leave the TUI", usage: "/exit" },
   { name: "quit", description: "leave the TUI (alias)", usage: "/quit" },
 ];
@@ -787,11 +864,23 @@ function helpText(): string {
   ].join("\n");
 }
 
-/** Minimal markdown-ish render: code fences dimmed, headers bold. */
+/** Thought-aware render: `<thought>` blocks collapse to a dimmed line. */
+export function renderAssistantMessage(raw: string): { thought: string | null; clean: string } {
+  const thought = extractThought(raw);
+  const clean = stripThought(raw);
+  return { thought, clean };
+}
+
+export function formatThoughtLine(thought: string, max = 300): string {
+  return chalk.dim(`\u{1F4AD} ${truncateThought(thought, max)}`);
+}
+
+/** Minimal markdown-ish render: code fences dimmed, headers bold. Thought blocks stripped to a dim line. */
 export function renderAssistant(text: string): string {
-  const lines = text.split("\n");
+  const { thought, clean } = renderAssistantMessage(text);
+  const lines = clean.split("\n");
   let inFence = false;
-  return lines
+  const body = lines
     .map((ln) => {
       if (ln.trimStart().startsWith("```")) {
         inFence = !inFence;
@@ -805,6 +894,8 @@ export function renderAssistant(text: string): string {
       return formatted;
     })
     .join("\n");
+  if (thought) return `${formatThoughtLine(thought)}\n${body}`;
+  return body;
 }
 
 // ---------------------------------------------------------------------------
@@ -887,7 +978,7 @@ export async function runTui(opts: TuiOptions = {}): Promise<void> {
     provider: client.provider,
   }, noLog);
 
-  const systemPrompt = opts.settings?.run?.system_prompt ??
+  const baseSystemPrompt = opts.settings?.run?.system_prompt ??
     "You are muse, a personal AI coding companion and task manager. " +
     "You are warm, direct, and technically brilliant. " +
     "For casual conversation, greetings, or questions — respond naturally like a knowledgeable colleague. Do NOT call tools. " +
@@ -897,6 +988,10 @@ export async function runTui(opts: TuiOptions = {}): Promise<void> {
     "Scope every file operation to explicit directories; never scan the whole filesystem. " +
     "You can help manage tasks, track progress, set priorities, and keep the user's workflow organized. " +
     "Explain plans briefly before running mutating commands.";
+  const learningsBlock = learningsContextBlock(workspace);
+  const systemPrompt = [baseSystemPrompt, THOUGHT_DIRECTIVE, LEARNING_DIRECTIVE, learningsBlock]
+    .filter((b) => b && b.trim().length > 0)
+    .join("\n\n");
 
   const history: ChatMessage[] = [
     {
@@ -904,6 +999,9 @@ export async function runTui(opts: TuiOptions = {}): Promise<void> {
       content: systemPrompt,
     },
   ];
+
+  const contextManager = new ContextManager(history);
+  bindContextManager(contextManager);
 
   let promptColor = chalk.bold.magenta;
   if (opts.settings?.tui?.theme === "catppuccin-mocha") {
@@ -1063,6 +1161,64 @@ export async function runTui(opts: TuiOptions = {}): Promise<void> {
           console.log(`approval → ${chalk.green(arg)}`);
         } else {
           console.log(chalk.red(`unknown mode: ${arg}`));
+        }
+        continue;
+      } else if (command === "session") {
+        try {
+          const sub = (arg || "status").toLowerCase();
+          if (sub === "status") {
+            const st = contextManager.getStatus();
+            console.log(
+              [
+                `${chalk.dim("messages:")} ${st.messages}`,
+                `${chalk.dim("tokens:")} ~${st.estimatedTokens} / ${st.limit} (${(st.usageRatio * 100).toFixed(1)}%)`,
+                `${chalk.dim("compaction:")} ${st.needsCompaction ? chalk.yellow("recommended — /session compact") : chalk.green("not needed")}`,
+              ].join("\n"),
+            );
+          } else if (sub === "compact") {
+            const before = contextManager.getStatus();
+            await contextManager.compact(async (turns) => ContextManager.fallbackSummary(turns));
+            const after = contextManager.getStatus();
+            console.log(chalk.green(`compacted ${before.messages} → ${after.messages} messages · ~${after.estimatedTokens} tokens`));
+            appendSessionLine(session, { type: "context_compact", ts: new Date().toISOString(), before: before.messages, after: after.messages }, noLog);
+          } else if (sub === "clear") {
+            const removed = contextManager.clear(true);
+            // history is the same array ContextManager mutates; system prompt survives.
+            console.log(chalk.dim(`cleared ${removed} message(s); system prompt preserved.`));
+            appendSessionLine(session, { type: "context_clear", ts: new Date().toISOString(), removed }, noLog);
+          } else {
+            console.log(chalk.red(`usage: /session [status|compact|clear]`));
+          }
+        } catch (err) {
+          console.log(chalk.red(`session failed: ${(err as Error).message}`));
+        }
+        continue;
+      } else if (command === "learn") {
+        try {
+          // Syntax: /learn [--global] [--mistake|--preference|--pattern] <lesson>
+          let scope: "project" | "global" = "project";
+          let category: "mistake" | "preference" | "pattern" = "pattern";
+          let lesson = arg;
+          const toks = lesson.split(/\s+/).filter(Boolean);
+          const rest: string[] = [];
+          for (const t of toks) {
+            if (t === "--global") scope = "global";
+            else if (t === "--project") scope = "project";
+            else if (t === "--mistake") category = "mistake";
+            else if (t === "--preference") category = "preference";
+            else if (t === "--pattern") category = "pattern";
+            else rest.push(t);
+          }
+          lesson = rest.join(" ").trim();
+          if (lesson.length < 10) {
+            console.log(chalk.red("usage: /learn [--global] [--mistake|--preference|--pattern] <lesson min 10 chars>"));
+            continue;
+          }
+          const msg = persistLesson({ lesson, scope, category, workspace });
+          const skillFile = maybePromoteLessonToSkill(lesson, workspace, 3);
+          console.log(chalk.green(msg) + (skillFile ? chalk.dim(` (skill: ${skillFile})`) : ""));
+        } catch (err) {
+          console.log(chalk.red(`learn failed: ${(err as Error).message}`));
         }
         continue;
       } else if (command === "tools") {
@@ -1313,7 +1469,12 @@ export async function runTui(opts: TuiOptions = {}): Promise<void> {
             | { type: "tool_calls"; toolCalls: ToolCall[] };
           if (evt.type === "text") {
             out += evt.delta;
-            process.stdout.write(evt.delta);
+            // Render thought content dimmed live; visible text raw.
+            if (/<\/?thought>/.test(evt.delta)) {
+              process.stdout.write(chalk.dim(evt.delta));
+            } else {
+              process.stdout.write(evt.delta);
+            }
           }
         }
         process.stdout.write("\n");
@@ -1327,10 +1488,11 @@ export async function runTui(opts: TuiOptions = {}): Promise<void> {
         console.log(chalk.red(`\nrequest failed: ${(err as Error).message}`));
         break;
       }
-      history.push(full);
+      const sanitizedFull: ChatMessage = { ...full, content: sanitizeBeforeSave(full.content ?? "") };
+      history.push(sanitizedFull);
       appendSessionLine(
         session,
-        { type: "assistant", ts: new Date().toISOString(), content: full.content, tool_calls: full.tool_calls ?? [] },
+        { type: "assistant", ts: new Date().toISOString(), content: sanitizedFull.content, tool_calls: full.tool_calls ?? [] },
         noLog,
       );
 

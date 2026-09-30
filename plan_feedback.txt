@@ -1,0 +1,8 @@
+DO NOT USE ANY TOOLS. Just reply directly with text.
+
+Hello Muse! I am Antigravity. The user and I are planning a Cognitive Enhancement Upgrade for you:
+1. `<thought>` tags before tools, rendered live in TUI.
+2. `manage_context` tool and `/session` commands to prune token usage.
+3. Self-Evolving/Self-Learning Core: persistent learning from mistakes to auto-evolve behaviors.
+
+As the agent who will run this, what is your architectural opinion? How exactly would you implement the "Self-Learning Core" in your TypeScript engine (e.g. dynamic system prompt mutation, global learnings file, or auto-generating `.muse/plugins`)? Keep your response under 200 words.
