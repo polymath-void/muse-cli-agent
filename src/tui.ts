@@ -94,6 +94,18 @@ export const WORKSPACE_TOOL_DEFS: ToolDefinition[] = [
   {
     type: "function",
     function: {
+      name: "ast_search",
+      description: "Search the AST graph for a function/class symbol. ZERO token cost. ALWAYS use this instead of grep/search if NodeOS is available.",
+      parameters: {
+        type: "object",
+        properties: { symbol: { type: "string" } },
+        required: ["symbol"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "read_file",
       description: "Read a UTF-8 text file (bounded window). Path resolves against the workspace root.",
       parameters: {
@@ -510,6 +522,21 @@ export class WorkspaceTools {
           return this.listDir(str(args.path, "."));
         } catch (err) {
           return `error: ${(err as Error).message}`;
+        }
+      }
+      
+      case "ast_search": {
+        const symbol = String(args.symbol || "");
+        if (!symbol) return "error: ast_search requires 'symbol'";
+        
+        const dbPath = require('path').join(this.root, 'agy_nodeos.db');
+        if (!require('fs').existsSync(dbPath)) return "Error: agy_nodeos.db not found. Fallback to standard search.";
+        
+        try {
+          const r = await this.bash(`python3 -c "import sqlite3; c=sqlite3.connect('agy_nodeos.db'); [print(f'[{r[0]}] {r[1]} in {r[2]}') for r in c.execute('SELECT node_type, name, filepath FROM nodes WHERE name LIKE ? LIMIT 20', ('%'+'\${symbol}'+'%',)).fetchall()]"`, 5000);
+          return r.stdout || "No results found.";
+        } catch (e) {
+          return "error: " + String((e as Error).message);
         }
       }
       case "search": {
