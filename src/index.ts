@@ -642,7 +642,16 @@ export async function main(argv: string[] = process.argv): Promise<void> {
         const tools = new WorkspaceTools(workspace, approvalMode);
 
         const maxSteps = Number(cmdOpts.maxModelSteps ?? 4);
-        let messages: ChatMessage[] = [{ role: "user", content: prompt }];
+        const execSystemPrompt =
+          "You are muse-ts in WORKER MODE — invoked headlessly by an external orchestrator agent. " +
+          "Execute the given task precisely and efficiently. " +
+          "Use tools immediately without asking questions. Do NOT greet or chit-chat. " +
+          "Scope all file operations to the workspace directory. Never scan the whole filesystem. " +
+          "Complete the task in as few steps as possible, then stop.";
+        let messages: ChatMessage[] = [
+          { role: "system", content: execSystemPrompt },
+          { role: "user", content: prompt },
+        ];
         
         emit({ type: "turn_start", model: client.model });
         for (let step = 0; step < maxSteps; step++) {
