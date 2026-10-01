@@ -1,0 +1,8 @@
+The user has APPROVED your advanced TUI/UX Redesign Implementation Plan!
+Your mission is to implement this plan in its entirety.
+1. Run `npm install marked marked-terminal cli-highlight` (if needed for the markdown rendering).
+2. Modify `src/tui.ts` to implement the Token Footers, Thought block styling, UI Separators, and the Auto-Editor hook (use `@inquirer/prompts`'s `editor` prompt).
+3. Overhaul the `/tasks` interactive menu.
+4. Run your tests, ensure there are no build errors, and commit the UX overhaul to the repo!
+
+You have a massive 40-step budget. Do not stall. Implement everything.

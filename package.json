@@ -41,12 +41,16 @@
     "node": ">= 18.0.0"
   },
   "dependencies": {
+    "@inquirer/prompts": "^8.7.2",
     "chalk": "^6.0.1",
+    "cli-highlight": "^2.1.11",
     "commander": "^15.0.0",
     "inquirer": "^14.2.2",
-    "@inquirer/prompts": "^8.7.2"
+    "marked": "^15.0.12",
+    "marked-terminal": "^7.3.0"
   },
   "devDependencies": {
+    "@types/marked-terminal": "^6.1.1",
     "@types/node": "^22.7.0",
     "tsx": "^4.23.15",
     "typescript": "^5.9.2"

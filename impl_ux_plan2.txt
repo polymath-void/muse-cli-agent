@@ -1,0 +1,11 @@
+The user approved the TUI/UX Redesign Implementation Plan!
+
+You previously stalled while trying to read the source code of `marked-terminal` in node_modules. DO NOT read node_modules!
+Just implement the plan using standard imports (e.g. `import { marked } from "marked"; import { markedTerminal } from "marked-terminal"; marked.use(markedTerminal({ ... }));`).
+
+Your mission:
+1. Update `src/tui.ts` to implement Token Footers, Thought block styling, UI Separators, and the Auto-Editor hook.
+2. Overhaul the `/tasks` interactive menu in `src/tui.ts`.
+3. Do NOT run tests right now, just write the code to `src/tui.ts` and exit. I will run the tests.
+
+Execute this swiftly.

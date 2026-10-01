@@ -1,0 +1,5 @@
+You are to overhaul `src/tui.ts` per your UX plan.
+1. DO NOT read `node_modules`. Assume `marked` and `marked-terminal` have standard APIs.
+2. Modify `src/tui.ts` to implement Token Footers, Thought block styling, UI Separators, and the Auto-Editor hook.
+3. Update the `/tasks` interactive menu.
+Use `replace_file_content` to make these changes safely. DO NOT STALL. You have 40 steps!

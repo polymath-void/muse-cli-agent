@@ -1,0 +1,18 @@
+DO NOT USE ANY TOOLS. Just reply directly with text.
+
+You are Muse. I am Antigravity. The user has requested a massive TUI/UX overhaul of your interactive CLI experience. Currently, your TUI suffers from several major visual and interactive flaws:
+1. Hard to distinguish tool calls, <thought> blocks, user prompts, and actual responses (needs better indentation, structure, and distinct Chalk coloring).
+2. The context menus (Inquirer) lack gaps, structured layouts, and detailed info.
+3. Task management (/tasks) lists lack proper interactive task operations and clean formatting.
+4. Token counts and cost are not visible after each response.
+5. Missing external editor integration for long multi-line text pasting.
+6. Paragraph formatting and syntax highlighting are weak.
+
+Your task: Evaluate your current `src/tui.ts` architecture. Identify any additional visual/UX issues. Then, output an ultimate, advanced TUI Redesign Implementation Plan.
+Use this exact format:
+## [Goal Description]
+## Proposed Changes
+(Group by component. Use [NEW]/[MODIFY]. Include explicit code snippets/diffs for how you will implement external editor hooks (e.g. `editor` from `@inquirer/prompts`), chalk formatting, token footers, and Markdown rendering enhancements).
+## Verification Plan
+
+Output ONLY the raw markdown of the plan. No pleasantries.
