@@ -1118,29 +1118,75 @@ export async function runTui(opts: TuiOptions = {}): Promise<void> {
         if (!arg) {
           console.log(`current model: ${chalk.green(client.model)}`);
           try {
-            const models = await client.listModels();
-                        let displayModels = models;
-            if (client.provider === "meta") {
-               const extras = ["gemini 3.1 pro high", "gemini 3.1 pro low", "gemini-3.1-pro-preview", "gemini-3.1-flash-lite"];
-               for (const e of extras) {
-                   if (!displayModels.includes(e)) displayModels.push(e);
+            const { gatewayForModel, modelsForGateway, PERSISTABLE_GATEWAYS } = await import("./core/provider.js");
+            let liveModels: string[] = [];
+            try { liveModels = await client.listModels(); } catch {}
+            
+            // Collect all known models across gateways + live models
+            const allChoices: any[] = [];
+            
+            // Add custom injected ones that the user specifically requested
+            const Separator = (await import("@inquirer/prompts")).Separator;
+            allChoices.push(new Separator(`--- Custom / Native Aliases ---`));
+            const customExtras = ["gemini 3.1 pro high", "gemini 3.1 pro low", "gemini-3.1-pro-preview", "gemini-3.1-flash-lite"];
+            for (const c of customExtras) {
+               allChoices.push({ name: c, value: { model: c, provider: "google" } });
+            }
+            
+            // Add live models from active provider
+            if (liveModels.length > 0) {
+              allChoices.push(new Separator(`--- Active: ${client.provider} ---`));
+              for (const m of liveModels) {
+                if (!customExtras.includes(m)) {
+                   allChoices.push({ name: m, value: { model: m, provider: client.provider } });
+                }
+              }
+            }
+
+            // Group the rest
+            for (const gw of PERSISTABLE_GATEWAYS) {
+               const gModels = modelsForGateway(gw as string);
+               if (gModels.length === 0) continue;
+               allChoices.push(new Separator(`--- ${gw} ---`));
+               for (const m of gModels) {
+                  allChoices.push({ name: m, value: { model: m, provider: gw } });
                }
             }
-            const picked: string = await select({
+            
+            allChoices.push(new Separator("--- Other ---"));
+            allChoices.push({ name: "Type manually...", value: { model: "__manual__", provider: client.provider } });
+
+            const pickedObj = await select({
               message: "Select model",
-              choices: displayModels.map((m) => ({
-                name: m === client.model ? `${m} ${chalk.dim("(current)")}` : m,
-                value: m,
-              })),
-              pageSize: 12,
+              choices: allChoices,
+              pageSize: 15,
             });
-            if (picked && picked !== client.model) {
-              model = resolveModelAlias(picked);
-              (client as { model: string }).model = resolveModelAlias(picked);
-              console.log(`model → ${chalk.green(picked)}`);
+            
+            let finalModel = pickedObj.model;
+            let finalProvider = pickedObj.provider;
+            
+            if (finalModel === "__manual__") {
+               finalModel = await input({ message: "Model name:" });
+               finalProvider = gatewayForModel(finalModel); // Auto-guess provider for manual
             }
-          } catch {
-            console.log(chalk.dim("(model selection cancelled)"));
+
+            if (finalModel && finalModel !== client.model) {
+              model = resolveModelAlias(finalModel);
+              (client as any).model = model;
+              
+              // Auto-switch provider if the user picked a model from a different gateway group
+              if (finalProvider && finalProvider !== client.provider) {
+                 opts.provider = finalProvider;
+                 (client as any).provider = finalProvider;
+                 resolved = resolveCredential(undefined, finalProvider);
+                 client.setToken(resolved?.token || "");
+                 console.log(chalk.dim(`Auto-switched provider to ${finalProvider}`));
+              }
+              
+              console.log(`model → ${chalk.green(finalModel)}`);
+            }
+          } catch (e) {
+             console.log(chalk.red("Failed to load model list: " + (e as Error).message));
           }
         } else {
           model = arg;
