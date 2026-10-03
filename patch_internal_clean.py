@@ -1,6 +1,6 @@
 import os
 
-path = "muse-cli-agent/src/tui.ts"
+path = "src/tui.ts"
 with open(path, "r") as f:
     content = f.read()
 

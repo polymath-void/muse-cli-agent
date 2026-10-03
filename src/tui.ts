@@ -1,4 +1,11 @@
 import { InternalCoreTools } from "./capabilities/internal_core.js";
+import { marked } from "marked";
+import { markedTerminal } from "marked-terminal";
+import cliHighlight from "cli-highlight";
+marked.use(markedTerminal({
+  code: ((c: any, l: any) => cliHighlight.highlight(String(c), { language: String(l||'text'), ignoreIllegals: true })) as any,
+  heading: (t: any) => '\n' + chalk.bold.underline.hex('#7EE787')(String(t)) + '\n'
+}) as any);
 /**
  * src/tui.ts — Interactive agent TUI replicating the Muse CLI chat interface.
  *
@@ -754,7 +761,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   { name: "editor", description: "compose a long prompt in $EDITOR", usage: "/editor" },
   { name: "login", description: "Meta device-flow login (native TS)", usage: "/login" },
   { name: "logout", description: "remove stored Meta credentials", usage: "/logout" },
-  { name: "init", description: "NodeOS readiness briefing for this workspace", usage: "/init" },
+  { name: "init", description: "NodeOS readiness briefing for this.root", usage: "/init" },
   { name: "boot", description: "boot the NodeOS daemon when offline, then re-check", usage: "/boot" },
   { name: "project", description: "attach @project context into this turn", usage: "/project <name>" },
   { name: "skill", description: "attach @skill context into this turn", usage: "/skill <name>" },
@@ -890,27 +897,7 @@ export function formatThoughtLine(thought: string, max = 300): string {
 }
 
 /** Minimal markdown-ish render: code fences dimmed, headers bold. Thought blocks stripped to a dim line. */
-export function renderAssistant(text: string): string {
-  const { thought, clean } = renderAssistantMessage(text);
-  const lines = clean.split("\n");
-  let inFence = false;
-  const body = lines
-    .map((ln) => {
-      if (ln.trimStart().startsWith("```")) {
-        inFence = !inFence;
-        return chalk.dim(ln);
-      }
-      if (inFence) return chalk.dim(ln);
-      if (/^#{1,4}\s/.test(ln)) return chalk.bold.white(ln);
-      
-      let formatted = ln.replace(/\[([^\]]+)\]\(([^)]+)\)/g, chalk.bold.blue('[$1]') + chalk.dim('($2)'));
-      formatted = formatted.replace(/\*\*([^*]+)\*\*/g, chalk.bold('$1'));
-      return formatted;
-    })
-    .join("\n");
-  if (thought) return `${formatThoughtLine(thought)}\n${body}`;
-  return body;
-}
+export function renderAssistant(text: string): string { return marked.parse(text) as string; }
 
 // ---------------------------------------------------------------------------
 // Main TUI loop
@@ -1263,7 +1250,7 @@ export async function runTui(opts: TuiOptions = {}): Promise<void> {
         }
         continue;
       } else if (command === "init") {
-        // Explicit readiness briefing for this workspace (no boot).
+        // Explicit readiness briefing for this.root (no boot).
         await runInit({ target: workspace });
         continue;
       } else if (command === "boot") {
@@ -1342,11 +1329,10 @@ export async function runTui(opts: TuiOptions = {}): Promise<void> {
           } else {
             const items = sub === "next" ? nextTasks(workspace, 5) : loadTasks(workspace);
             if (items.length === 0) {
-              console.log(chalk.dim("(no tasks — /tasks add <title>)"));
+              console.log(chalk.dim("(no tasks)"));
             } else {
-              console.log(chalk.bold("tasks:"));
               for (const t of items.slice(0, 20)) {
-                const mark = t.status === "done" ? chalk.green("x") : t.status === "in-progress" ? chalk.yellow("~") : chalk.dim(" ");
+                const mark = t.status === "done" ? chalk.green("●") : t.status === "in-progress" ? chalk.yellow("◐") : chalk.dim("○");
                 console.log(`  [${mark}] ${chalk.cyan(t.id)} ${chalk.dim(t.priority)} ${t.title.slice(0, 120)}`);
               }
             }

@@ -340,7 +340,7 @@ export function resolveCredential(authPath?: string, provider?: string): Credent
 export const DEFAULT_OPENCODE_API_BASE_URL =
   process.env.OPENCODE_API_BASE_URL ?? "https://opencode.ai/zen/v1";
 export const DEFAULT_GOOGLE_API_BASE_URL =
-  process.env.GOOGLE_API_BASE_URL ?? "https://generativelanguage.googleapis.com/v1beta";
+  process.env.GOOGLE_API_BASE_URL ?? "https://generativelanguage.googleapis.com/v1beta/openai";
 export const DEFAULT_AGY_API_BASE_URL = "https://cloudcode-pa.googleapis.com/v1internal";
 
 export function defaultBaseUrlFor(provider: string): string {

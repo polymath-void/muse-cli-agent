@@ -49,6 +49,7 @@ import {
   type ToolCall,
 } from "./tui.js";
 import { runInit } from "./nodeos.js";
+import { initializeRuntime } from "./runtime/daemon.js";
 import { watchCommand } from "./cli/watch.js";
 
 // ---------------------------------------------------------------------------
@@ -441,7 +442,7 @@ export async function main(argv: string[] = process.argv): Promise<void> {
     .name("muse-ts")
     .description("muse-ts — interactive terminal coding agent (native TypeScript, no Rust)")
     .version("1.0.0")
-    .option("--provider <mode>", "startup provider: echo, meta, or local", "meta")
+    .option("--provider <mode>", "startup provider: echo, meta, local, agy, google, opencode", "meta")
     .option("--model <model>", "model id for non-echo providers")
     .option("--reasoning-effort <effort>", "meta reasoning effort", "high")
     .option("--base-url <url>", "override the Meta provider base URL")
@@ -458,40 +459,71 @@ export async function main(argv: string[] = process.argv): Promise<void> {
     .option("--disable-sandbox", "accepted for Rust-CLI compat (no sandbox in TS preview)")
     .argument("[prompt]", "initial prompt; starts the interactive TUI with this message queued");
 
+  
   program
     .command("login")
-    .description("Log in with your Meta account: approve a code in your browser (native TS device flow)")
+    .description("Interactive Multi-Provider Login Menu")
     .option("--auth-base-url <url>", "override OAuth base URL")
     .option("--api-base-url <url>", "override Model API base URL")
     .option("--no-open-browser", "do not auto-open the verification URL")
-    .action(async (cmdOpts: { authBaseUrl?: string; apiBaseUrl?: string; openBrowser?: boolean }) => {
+    .action(async (cmdOpts: any) => {
       try {
-        console.log(chalk.bold.cyan("Meta login (device flow, native TypeScript)"));
-        const { meta, authPath } = await loginDeviceFlow({
-          authBaseUrl: cmdOpts.authBaseUrl,
-          apiBaseUrl: cmdOpts.apiBaseUrl,
-          openBrowser: cmdOpts.openBrowser,
-          onStatus: (m) => console.log(chalk.dim(`… ${m}`)),
-          onDeviceCode: (info) => {
-            console.log("");
-            console.log(`  ${chalk.dim("1. Open:")} ${chalk.cyan.underline(info.verificationUriComplete)}`);
-            console.log(`  ${chalk.dim("2. Code:")} ${chalk.bold.yellow(info.userCode)}`);
-            console.log("");
-          },
+        const { select, input } = await import("@inquirer/prompts");
+        const picked = await select({
+          message: "Select Provider to Authenticate:",
+          choices: [
+            { name: "meta (Device Flow)", value: "meta" },
+            { name: "agy (API Key)", value: "agy" },
+            { name: "google (API Key)", value: "google" },
+            { name: "opencode (API Key)", value: "opencode" }
+          ]
         });
-        console.log(chalk.green("Login complete."));
-        console.log(`${chalk.dim("stored:")} ${authPath}`);
-        if (meta.user_email) console.log(`${chalk.dim("account:")} ${meta.user_email}`);
-      } catch (err) {
-        if (err instanceof AuthError) {
-          console.error(chalk.red(`login failed [${err.code}]: ${err.message}`));
-          if (err.hint) console.error(chalk.dim(err.hint));
+
+        if (picked === "meta") {
+          console.log(chalk.bold.cyan("Meta login (device flow, native TypeScript)"));
+          const { loginDeviceFlow } = await import("./auth.js");
+          const { meta, authPath } = await loginDeviceFlow({
+            authBaseUrl: cmdOpts.authBaseUrl,
+            apiBaseUrl: cmdOpts.apiBaseUrl,
+            openBrowser: cmdOpts.openBrowser,
+            onStatus: (m) => console.log(chalk.dim(`… ${m}`)),
+            onDeviceCode: (info) => {
+              console.log("");
+              console.log(`  ${chalk.dim("1. Open:")} ${chalk.cyan.underline(info.verificationUriComplete)}`);
+              console.log(`  ${chalk.dim("2. Code:")} ${chalk.bold.yellow(info.userCode)}`);
+              console.log("");
+            },
+          });
+          console.log(chalk.green("Login complete."));
+          console.log(`${chalk.dim("stored:")} ${authPath}`);
         } else {
-          console.error(chalk.red(`login failed: ${(err as Error).message}`));
+           const apiKey = await input({ message: `Enter API Key for ${picked}:` });
+           const { authSetApiKeyFromStdin } = await import("./auth.js");
+           // Hacky way to inject it since authSetApiKeyFromStdin reads from process.stdin in the original CLI, 
+           // but we can also just write directly to the config if it's simpler.
+           // However, to reuse native auth:
+           const fs = await import("node:fs");
+           const path = await import("node:path");
+           const os = await import("node:os");
+           
+           const confDir = path.join(os.homedir(), ".config", "muse");
+           if (!fs.existsSync(confDir)) fs.mkdirSync(confDir, { recursive: true });
+           const authPath = path.join(confDir, "auth.json");
+           let authData: any = {};
+           if (fs.existsSync(authPath)) {
+               try { authData = JSON.parse(fs.readFileSync(authPath, "utf-8")); } catch(e){}
+           }
+           if (!authData.providers) authData.providers = {};
+           authData.providers[picked] = { api_key: apiKey.trim(), updated_at: new Date().toISOString() };
+           fs.writeFileSync(authPath, JSON.stringify(authData, null, 2));
+           console.log(chalk.green(`${picked} credentials saved → ${authPath}`));
         }
+      } catch (err: any) {
+        console.error(chalk.red(`login failed: ${err.message}`));
         process.exitCode = 1;
       }
     });
+
 
   program
     .command("logout")
@@ -842,6 +874,9 @@ export async function main(argv: string[] = process.argv): Promise<void> {
       }
     }
     try {
+      const workspacePath = path.resolve(String(global.workspace ?? process.cwd()));
+      const runtime = initializeRuntime(workspacePath);
+      runtime.start();
       await runTui({
         model: global.model,
         reasoningEffort: effort,

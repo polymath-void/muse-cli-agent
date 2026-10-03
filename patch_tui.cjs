@@ -6,15 +6,15 @@ code = `import { marked } from "marked";
 import { markedTerminal } from "marked-terminal";
 import cliHighlight from "cli-highlight";
 marked.use(markedTerminal({
-  code: (c, l) => cliHighlight.highlight(c, { language: l||'text', ignoreIllegals: true }),
-  heading: (t) => '\\n' + chalk.bold.underline.hex('#7EE787')(t) + '\\n'
-}));
+  code: (c: any, l: any) => cliHighlight.highlight(String(c), { language: String(l||'text'), ignoreIllegals: true }),
+  heading: (t: any) => '\\n' + chalk.bold.underline.hex('#7EE787')(String(t)) + '\\n'
+}) as any);
 ` + code;
 
 // 2. Replace renderAssistant with marked render
 code = code.replace(
   /export function renderAssistant\(text: string\): string \{\n(.*?)\n\}/s,
-  `export function renderAssistant(text: string): string { return marked.parse(text); }`
+  `export function renderAssistant(text: string): string { return marked.parse(text) as string; }`
 );
 
 // 3. Add token footer in turn loop
@@ -34,7 +34,7 @@ code = code.replace(
               console.log(chalk.dim("(no tasks)"));
             } else {
               for (const t of items.slice(0, 20)) {
-                const mark = t.status === "done" ? chalk.green("●") : t.status === "in_progress" ? chalk.yellow("◐") : chalk.dim("○");
+                const mark = t.status === "done" ? chalk.green("●") : t.status === "in-progress" ? chalk.yellow("◐") : chalk.dim("○");
                 console.log(\`  [\${mark}] \${chalk.cyan(t.id)} \${chalk.dim(t.priority)} \${t.title.slice(0, 120)}\`);
               }
             }
@@ -42,4 +42,4 @@ code = code.replace(
 );
 
 fs.writeFileSync('src/tui.ts', code);
-console.log('TUI Patched');
+console.log('TUI Patched with TS fixes');
