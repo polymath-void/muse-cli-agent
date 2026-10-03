@@ -43,6 +43,8 @@ import { runInit } from "./nodeos.js";
 import { NanoRegistry, FsNano, MentionNano, PluginNano, PermissionNano, SessionNano } from "./services/index.js";
 import { loadTasks, addTask, setTaskStatus, nextTasks, readMemory, appendMemory } from "./companion/index.js";
 import { extractThought, stripThought, sanitizeBeforeSave, truncateThought, THOUGHT_DIRECTIVE, LEARNING_DIRECTIVE } from "./core/thought.js";
+import { loadAuthFile } from "./auth.js";
+import { UnifiedRouter } from "./microservices/connector/router.js";
 import { ContextManager } from "./core/context-manager.js";
 import { persistLesson, loadLearnings, learningsContextBlock, maybePromoteLessonToSkill, LEARN_CATEGORIES } from "./core/learnings.js";
 
@@ -236,7 +238,8 @@ export class MetaChatClient {
   readonly reasoningEffort: ReasoningEffort;
   readonly parallelToolCalls: boolean;
   private token: string;
-  readonly provider: "meta" | "echo" | "local";
+  readonly provider: string;
+  private router = new UnifiedRouter();
 
   constructor(opts: {
     token: string;
@@ -304,6 +307,14 @@ export class MetaChatClient {
         content: `[${this.provider} provider — no network]\necho: ${last?.content ?? "(empty)"}`,
       };
     }
+    const body = this.buildBody(messages, tools, false);
+    if (this.provider === "google" || this.provider === "agy" || this.provider === "opencode") {
+      const providersConfig = loadAuthFile(undefined).providers;
+      const resp = await this.router.route(this.provider, this.model, body, false, providersConfig);
+      const msg = resp.choices?.[0]?.message;
+      if (!msg) throw new Error("Invalid response from UnifiedRouter");
+      return msg;
+    }
     const res = await fetch(`${this.baseUrl}/chat/completions`, {
       method: "POST",
       headers: {
@@ -311,7 +322,7 @@ export class MetaChatClient {
         "content-type": "application/json",
         accept: "application/json",
       },
-      body: JSON.stringify(this.buildBody(messages, tools, false)),
+      body: JSON.stringify(body),
     });
     if (!res.ok) {
       const text = (await res.text()).slice(0, 1000);
