@@ -87,7 +87,7 @@ export interface TuiOptions {
   baseUrl?: string;
   workspace?: string;
   approvalMode?: ApprovalMode;
-  provider?: "meta" | "echo" | "local";
+  provider?: string;
   parallelToolCalls?: boolean;
   sessionId?: string;
   noSessionLog?: boolean;
@@ -247,7 +247,7 @@ export class MetaChatClient {
     model?: string;
     reasoningEffort?: ReasoningEffort;
     parallelToolCalls?: boolean;
-    provider?: "meta" | "echo" | "local";
+    provider?: string;
   }) {
     this.token = opts.token;
     this.baseUrl = (opts.baseUrl ?? DEFAULT_API_BASE_URL).replace(/\/+$/, "");
@@ -1299,11 +1299,76 @@ export async function runTui(opts: TuiOptions = {}): Promise<void> {
         // Same code path as `muse-ts init --boot` (see src/nodeos.ts).
         await runInit({ boot: true, target: workspace });
         continue;
-      } else if (command === "login" || command === "logout") {
-        console.log(
-          chalk.dim(`/${command} runs from the shell in this preview — use:`),
-          chalk.cyan(command === "login" ? "muse-ts login" : "muse-ts logout"),
-        );
+      } else if (command === "provider") {
+        const picked = await select({
+          message: "Select Provider:",
+          choices: [
+            { name: "meta", value: "meta" },
+            { name: "agy", value: "agy" },
+            { name: "google", value: "google" },
+            { name: "opencode", value: "opencode" }
+          ]
+        });
+        opts.provider = picked;
+        (client as any).provider = picked;
+        resolved = resolveCredential(undefined, opts.provider);
+        client.setToken(resolved?.token || "");
+        console.log(`Switched provider to ${chalk.green(picked)}`);
+        continue;
+      } else if (command === "login") {
+        const picked = await select({
+          message: "Select Provider to Authenticate:",
+          choices: [
+            { name: "meta (Device Flow)", value: "meta" },
+            { name: "agy (API Key)", value: "agy" },
+            { name: "google (API Key)", value: "google" },
+            { name: "opencode (API Key)", value: "opencode" }
+          ]
+        });
+
+        if (picked === "meta") {
+          console.log(chalk.bold.cyan("Meta login (device flow, native TypeScript)"));
+          const { loginDeviceFlow } = await import("./auth.js");
+          const { meta, authPath } = await loginDeviceFlow({
+            openBrowser: true,
+            onStatus: (m) => console.log(chalk.dim(`… ${m}`)),
+            onDeviceCode: (info) => {
+              console.log("");
+              console.log(`  ${chalk.dim("1. Open:")} ${chalk.cyan.underline(info.verificationUriComplete)}`);
+              console.log(`  ${chalk.dim("2. Code:")} ${chalk.bold.yellow(info.userCode)}`);
+              console.log("");
+            },
+          });
+          console.log(chalk.green("Login complete."));
+        } else {
+           const apiKey = await input({ message: `Enter API Key for ${picked}:` });
+           const fs = await import("node:fs");
+           const path = await import("node:path");
+           const os = await import("node:os");
+           
+           const confDir = path.join(os.homedir(), ".config", "muse");
+           if (!fs.existsSync(confDir)) fs.mkdirSync(confDir, { recursive: true });
+           const authFile = path.join(confDir, "auth.json");
+           
+           let config: any = { schema_version: 1, providers: {} };
+           if (fs.existsSync(authFile)) {
+               try { config = JSON.parse(fs.readFileSync(authFile, "utf8")); } catch {}
+           }
+           if (!config.providers) config.providers = {};
+           if (!config.providers[picked]) config.providers[picked] = {};
+           config.providers[picked].api_key = apiKey;
+           
+           fs.writeFileSync(authFile, JSON.stringify(config, null, 2));
+           console.log(chalk.green(`API key for ${picked} stored in ${authFile}.`));
+        }
+        
+        opts.provider = picked;
+        (client as any).provider = picked;
+        resolved = resolveCredential(undefined, opts.provider);
+        client.setToken(resolved?.token || "");
+        continue;
+      } else if (command === "logout") {
+        console.log(`Please exit and run: muse-ts logout`);
         continue;
       } else if (command === "project" || command === "skill") {
         const kind = command as "project" | "skill";
