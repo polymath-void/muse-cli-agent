@@ -31,14 +31,7 @@ export interface ResolvedSelection {
 
 
 export function resolveModelAlias(model: string): string {
-  const lower = model.toLowerCase().replace(/\s+/g, "-");
-  
-  // User's custom aliases for gemini
-  if (lower === "gemini-3.1-pro-high") return "gemini-3.1-pro-preview";
-  if (lower === "gemini-3.1-pro-lite" || lower === "gemini-3.1-flash-lite") return "gemini-3.1-flash-lite";
-  if (lower === "gemini-3.1-pro") return "gemini-3.1-pro-preview";
-  if (lower === "gemini-2.5-pro") return "gemini-3.1-pro-preview";
-  
+  // Pass-through exactly what the user provides, since they confirmed their backend supports these exact names.
   return model;
 }
 

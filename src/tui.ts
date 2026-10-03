@@ -1110,7 +1110,7 @@ export async function runTui(opts: TuiOptions = {}): Promise<void> {
             const models = await client.listModels();
                         let displayModels = models;
             if (client.provider === "meta") {
-               const extras = ["gemini-3.1-pro-high", "gemini-3.1-pro-lite", "gemini-3.1-pro", "gemini-2.5-pro"];
+               const extras = ["gemini 3.1 pro high", "gemini 3.1 pro low", "gemini-3.1-pro-preview", "gemini-3.1-flash-lite"];
                for (const e of extras) {
                    if (!displayModels.includes(e)) displayModels.push(e);
                }
