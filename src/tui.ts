@@ -1032,6 +1032,7 @@ export async function runTui(opts: TuiOptions = {}): Promise<void> {
       try {
         userText = await input({
           message: promptColor("›"),
+          default: queuedInitial || undefined,
           theme: { prefix: "" }
         });
         userText = userText.trim();
@@ -1043,10 +1044,22 @@ export async function runTui(opts: TuiOptions = {}): Promise<void> {
     if (!userText) continue;
     appendXdgHistory(userText);
 
+    // Bare "@" -> Interactive Mention Menu
+    if (userText.trim() === "@") {
+      const picked = await promptMentionMenu(workspace);
+      if (picked) {
+          queuedInitial = `@${picked.kind} ${picked.value} `;
+      }
+      continue;
+    }
+
     // ---- slash commands (explicit only — boot/init never auto-run) ----
     if (userText.startsWith("/")) {
       let parsed = parseSlashInput(userText);
       // Bare "/" → interactive menu so users never have to guess.
+      
+
+
       if (!parsed || isSlashMenuTrigger(userText)) {
         const picked = await promptSlashMenu();
         if (!picked) continue;
@@ -1094,7 +1107,7 @@ export async function runTui(opts: TuiOptions = {}): Promise<void> {
           console.log(`current model: ${chalk.green(client.model)}`);
           try {
             const models = await client.listModels();
-            const displayModels = models.slice(0, 20);
+            const displayModels = models;
             const picked: string = await select({
               message: "Select model",
               choices: displayModels.map((m) => ({
@@ -1602,4 +1615,74 @@ export async function runTui(opts: TuiOptions = {}): Promise<void> {
 
   nanos.sleepAll();
   appendSessionLine(session, { type: "session_end", ts: new Date().toISOString() }, noLog);
+}
+
+
+function globWorkspaceFiles(dir: string, root: string, depth = 0): string[] {
+  if (depth > 4) return [];
+  let res: string[] = [];
+  try {
+    for (const f of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (f.name === 'node_modules' || f.name === '.git' || f.name === 'dist') continue;
+      const p = path.join(dir, f.name);
+      if (f.isDirectory()) res.push(...globWorkspaceFiles(p, root, depth + 1));
+      else res.push(path.relative(root, p));
+    }
+  } catch {}
+  return res;
+}
+
+export async function promptMentionMenu(root: string): Promise<{kind: string, value: string} | null> {
+  try {
+    const kind = await select({
+      message: "Mention type",
+      choices: [
+        { name: "file", value: "file", description: "Inject a file from the workspace" },
+        { name: "skill", value: "skill", description: "Inject a markdown skill" },
+        { name: "plugin", value: "plugin", description: "Inject a plugin context" },
+        { name: "project", value: "project", description: "Inject a project context" }
+      ]
+    });
+    
+    if (kind === "file") {
+        const files = globWorkspaceFiles(root, root);
+        const picked = await search({
+           message: "Search file",
+           source: async (term) => {
+              const q = (term || "").toLowerCase();
+              return files.filter(f => f.toLowerCase().includes(q)).slice(0, 25).map(f => ({ name: f, value: f }));
+           }
+        });
+        return { kind: "file", value: picked };
+    } else if (kind === "skill") {
+        const localSkills = path.join(root, ".agents", "skills");
+        const globalSkills = path.join(process.env.HOME || "", ".gemini", "config", "skills");
+        const skills: string[] = [];
+        try { if (fs.existsSync(localSkills)) skills.push(...fs.readdirSync(localSkills)); } catch {}
+        try { if (fs.existsSync(globalSkills)) skills.push(...fs.readdirSync(globalSkills)); } catch {}
+        const uniqueSkills = Array.from(new Set(skills));
+        
+        const picked = await search({
+           message: "Search skill",
+           source: async (term) => {
+              const q = (term || "").toLowerCase();
+              return uniqueSkills.filter(s => s.toLowerCase().includes(q)).map(s => ({ name: s, value: s }));
+           }
+        });
+        return { kind: "skill", value: picked };
+    } else if (kind === "plugin") {
+        // Known plugins
+        const plugins = ["git", "system", "powerhouse", "web"];
+        const picked = await select({
+           message: "Select plugin",
+           choices: plugins.map(p => ({ name: p, value: p }))
+        });
+        return { kind: "plugin", value: picked };
+    } else {
+        const val = await input({ message: `${kind} name:` });
+        return { kind, value: val };
+    }
+  } catch {
+    return null;
+  }
 }

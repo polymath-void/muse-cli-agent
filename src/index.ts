@@ -573,9 +573,11 @@ export async function main(argv: string[] = process.argv): Promise<void> {
 
   program
     .command("models")
-    .description("List Meta models")
+    .description("List models for the active or specified provider")
     .action(async () => {
-      const resolved = resolveCredential();
+      const opts = program.opts();
+      const provider = opts.provider;
+      const resolved = resolveCredential(undefined, provider);
       if (!resolved) {
         console.error(chalk.red("not logged in — run `muse-ts login` or set META_API_KEY"));
         process.exitCode = 1;

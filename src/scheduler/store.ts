@@ -52,6 +52,6 @@ export function validateCron(cronExpression: string): boolean {
 
 export function getNextRun(cronExpression: string, lastRun?: number): number {
   const options = lastRun ? { currentDate: new Date(lastRun) } : {};
-  const interval = new CronExpressionParser(cronExpression, options);
+  const interval = CronExpressionParser.parse(cronExpression, options);
   return interval.next().getTime();
 }
