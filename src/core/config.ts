@@ -48,6 +48,11 @@ export function lmkSnapshotPath(workspace: string): string {
   return path.join(workspace, ".muse", "tmp.json");
 }
 
+/** Last-used model/gateway/effort memory (restored on restart). */
+export function lastModelPath(workspace: string): string {
+  return path.join(workspace, ".muse", "last-model.json");
+}
+
 export function workflowPath(workspace: string): string {
   return path.join(workspace, "workflow.json");
 }

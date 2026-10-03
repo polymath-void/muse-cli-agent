@@ -1,3 +1,4 @@
+import { InternalCoreTools } from "./capabilities/internal_core.js";
 /**
  * src/tui.ts — Interactive agent TUI replicating the Muse CLI chat interface.
  *
@@ -548,6 +549,19 @@ export class WorkspaceTools {
       typeof v === "number" && Number.isFinite(v) ? v : fallback;
 
     switch (name) {
+      case "internal_workspace_snapshot": {
+        const internal = new InternalCoreTools(this.root);
+        return internal.internalWorkspaceSnapshot(num(args.max_depth, 2));
+      }
+      case "internal_python_eval": {
+        const internal = new InternalCoreTools(this.root);
+        return internal.internalPythonEval(str(args.code));
+      }
+      case "internal_memory_search": {
+        const internal = new InternalCoreTools(this.root);
+        return internal.internalMemorySearch();
+      }
+
       case "read_file": {
         const p = str(args.path);
         if (!p) return "error: read_file requires `path`";

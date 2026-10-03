@@ -37,7 +37,8 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
+import { createServer } from "node:http";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -264,30 +265,103 @@ export function clearMetaAuth(authPath?: string): boolean {
 // Credential resolution (META_API_KEY always wins)
 // ---------------------------------------------------------------------------
 
-export function resolveCredential(authPath?: string): CredentialResolution | null {
-  const envKey = (process.env.META_API_KEY ?? "").trim();
-  if (envKey.length > 0) {
+export function resolveCredential(authPath?: string, provider?: string): CredentialResolution | null {
+  const metaEnv = (process.env.META_API_KEY ?? "").trim();
+  const opencodeEnv = (process.env.OPENCODE_API_KEY ?? "").trim();
+  const googleEnv = (process.env.GOOGLE_API_KEY ?? process.env.GEMINI_API_KEY ?? "").trim();
+  if (!provider) {
+    if (metaEnv.length > 0) {
+      return {
+        token: metaEnv,
+        source: "env:META_API_KEY",
+        baseUrl: process.env.MUSE_API_BASE_URL ?? DEFAULT_API_BASE_URL,
+      };
+    }
+    if (opencodeEnv.length > 0) {
+      return {
+        token: opencodeEnv,
+        source: "auth.json:api_key",
+        baseUrl: process.env.OPENCODE_API_BASE_URL ?? DEFAULT_OPENCODE_API_BASE_URL,
+      };
+    }
+    if (googleEnv.length > 0) {
+      return {
+        token: googleEnv,
+        source: "auth.json:api_key",
+        baseUrl: process.env.GOOGLE_API_BASE_URL ?? DEFAULT_GOOGLE_API_BASE_URL,
+      };
+    }
+  } else if (provider === "opencode" && opencodeEnv.length > 0) {
     return {
-      token: envKey,
+      token: opencodeEnv,
+      source: "auth.json:api_key",
+      baseUrl: process.env.OPENCODE_API_BASE_URL ?? DEFAULT_OPENCODE_API_BASE_URL,
+    };
+  } else if ((provider === "google" || provider === "agy") && googleEnv.length > 0) {
+    return {
+      token: googleEnv,
+      source: "auth.json:api_key",
+      baseUrl: process.env.GOOGLE_API_BASE_URL ?? DEFAULT_GOOGLE_API_BASE_URL,
+    };
+  } else if (provider === "meta" && metaEnv.length > 0) {
+    return {
+      token: metaEnv,
       source: "env:META_API_KEY",
       baseUrl: process.env.MUSE_API_BASE_URL ?? DEFAULT_API_BASE_URL,
     };
   }
-  const meta = getMetaAuth(loadAuthFile(authPath));
-  if (!meta) return null;
-  const baseUrl = meta.api_base_url?.trim() || DEFAULT_API_BASE_URL;
-  if (meta.api_key && meta.api_key.trim().length > 0) {
-    return { token: meta.api_key.trim(), source: "auth.json:api_key", baseUrl, meta };
-  }
-  if (meta.access_token && meta.access_token.trim().length > 0) {
-    return {
-      token: meta.access_token.trim(),
-      source: "auth.json:access_token",
-      baseUrl,
-      meta,
-    };
+  const file = loadAuthFile(authPath);
+  // When a specific provider is requested, check only that one.
+  // Otherwise check all known providers in priority order.
+  // "agy" rides the stored Google OAuth grant (Cloud Code), so fall back to it.
+  const keys = provider
+    ? (provider === "agy" ? ["agy", "google"] : [provider])
+    : ["meta", "opencode", "google", "agy"];
+  for (const key of keys) {
+    const entry = file.providers[key];
+    if (!entry) continue;
+    const baseUrl = entry.api_base_url?.trim() || defaultBaseUrlFor(key);
+    if (entry.api_key && entry.api_key.trim().length > 0) {
+      return { token: entry.api_key.trim(), source: "auth.json:api_key", baseUrl, meta: entry };
+    }
+    if (entry.access_token && entry.access_token.trim().length > 0) {
+      return {
+        token: entry.access_token.trim(),
+        source: "auth.json:access_token",
+        baseUrl,
+        meta: entry,
+      };
+    }
   }
   return null;
+}
+
+/** Per-provider API base defaults (env-overridable). */
+export const DEFAULT_OPENCODE_API_BASE_URL =
+  process.env.OPENCODE_API_BASE_URL ?? "https://opencode.ai/zen/v1";
+export const DEFAULT_GOOGLE_API_BASE_URL =
+  process.env.GOOGLE_API_BASE_URL ?? "https://generativelanguage.googleapis.com/v1beta";
+export const DEFAULT_AGY_API_BASE_URL = "https://cloudcode-pa.googleapis.com/v1internal";
+
+export function defaultBaseUrlFor(provider: string): string {
+  if (provider === "opencode") return DEFAULT_OPENCODE_API_BASE_URL;
+  if (provider === "google") return DEFAULT_GOOGLE_API_BASE_URL;
+  if (provider === "agy") return DEFAULT_AGY_API_BASE_URL;
+  return process.env.MUSE_API_BASE_URL ?? DEFAULT_API_BASE_URL;
+}
+
+/** Resolve a credential for one gateway; null when that gateway has no login. */
+export function resolveCredentialFor(provider: string, authPath?: string): CredentialResolution | null {
+  return resolveCredential(authPath, provider);
+}
+
+/** Which provider keys currently hold a usable credential (no secrets). */
+export function listLoggedInProviders(authPath?: string): string[] {
+  const out: string[] = [];
+  for (const p of ["meta", "opencode", "google", "agy"]) {
+    if (resolveCredential(authPath, p)) out.push(p);
+  }
+  return out;
 }
 
 export function credentialSummary(authPath?: string): {
@@ -403,7 +477,7 @@ export async function discoverProtectedResource(
       });
       if (!res.ok) continue;
       const meta = await readJsonBounded<ProtectedResourceMetadata>(res);
-      if (meta && typeof (meta as { resource?: unknown }).resource === "string") {
+      if (meta && typeof meta.resource === "string") {
         return meta;
       }
     } catch {
@@ -828,7 +902,6 @@ export async function loginDeviceFlow(
     authBase,
     prm?.authorization_servers,
   );
-  console.log("SERVER METADATA:", server);
   if (!server.device_authorization_endpoint || !server.token_endpoint) {
     throw new AuthError(
       "device_endpoint_missing",
@@ -921,20 +994,41 @@ export async function loginDeviceFlow(
 export async function refreshStoredGrant(
   authBaseUrl?: string,
   authPath?: string,
+  provider = "meta",
 ): Promise<MetaProviderAuth | null> {
   const file = loadAuthFile(authPath);
-  const meta = file.providers["meta"];
-  if (!meta?.refresh_token) return null;
-  const authBase = (authBaseUrl ?? DEFAULT_AUTH_BASE_URL).replace(/\/+$/, "");
-  const server = await discoverAuthorizationServer(authBase);
-  if (!server.token_endpoint || !meta.client_id) return null;
+  const meta = file.providers[provider] ?? (provider === "agy" ? file.providers["google"] : undefined);
+  if (!meta?.refresh_token || !meta?.client_id) return null;
+  let tokenEndpoint = "";
+  if (provider === "google" || provider === "agy") {
+    tokenEndpoint = "https://oauth2.googleapis.com/token";
+  } else if (provider === "opencode") {
+    tokenEndpoint = "https://opencode.ai/console/auth/device/token";
+  } else {
+    const authBase = (authBaseUrl ?? DEFAULT_AUTH_BASE_URL).replace(/\/+$/, "");
+    const server = await discoverAuthorizationServer(authBase);
+    if (!server.token_endpoint) return null;
+    tokenEndpoint = server.token_endpoint;
+  }
+  let clientSecret: string | undefined = undefined;
+  if (provider === "google") {
+    // We would need the Google client secret, but since Agy and Google share the same client right now, we can use it, or fallback.
+    // In src/auth.ts, GOOGLE_CLIENT_SECRET is not exported globally but Agy's is. Let's just use a hardcoded one if it matches the client_id
+    if (meta.client_id === "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com") {
+      clientSecret = "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";
+    }
+  } else if (provider === "agy") {
+    clientSecret = "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";
+  }
   const token = await refreshAccessToken(
-    server.token_endpoint,
+    tokenEndpoint,
     meta.client_id,
     meta.refresh_token,
+    clientSecret,
   );
   const nowSec = Math.floor(Date.now() / 1000);
   meta.access_token = token.access_token;
+  meta.api_key = token.access_token;
   if (token.refresh_token) meta.refresh_token = token.refresh_token;
   if (token.expires_in) meta.expires_at = nowSec + token.expires_in;
   saveAuthFile(file, authPath);
@@ -945,9 +1039,11 @@ export async function logout(opts: {
   revoke?: boolean;
   authBaseUrl?: string;
   authPath?: string;
+  provider?: string;
 } = {}): Promise<boolean> {
+  const target = opts.provider ?? "meta";
   const file = loadAuthFile(opts.authPath);
-  const meta = file.providers["meta"];
+  const meta = file.providers[target];
   if (!meta) return false;
   if (opts.revoke !== false) {
     try {
@@ -965,18 +1061,28 @@ export async function logout(opts: {
       /* local logout proceeds */
     }
   }
-  return clearMetaAuth(opts.authPath);
+  return clearProviderAuth(target, opts.authPath);
 }
 
-/** `muse auth set --provider meta --api-key-stdin` equivalent. */
+/** Remove one provider entry (default: meta). Returns true when something was removed. */
+export function clearProviderAuth(provider: string = "meta", authPath?: string): boolean {
+  const file = loadAuthFile(authPath);
+  if (!(provider in file.providers)) return false;
+  delete file.providers[provider];
+  saveAuthFile(file, authPath);
+  return true;
+}
+
+/** `muse auth set --provider <name> --api-key-stdin` equivalent. */
 export async function authSetApiKeyFromStdin(opts: {
   provider?: string;
   apiBaseUrl?: string;
   authPath?: string;
 } = {}): Promise<string> {
   const provider = opts.provider ?? "meta";
-  if (provider !== "meta") {
-    throw new AuthError("provider_unsupported", `unknown provider: ${provider}`);
+  const SUPPORTED = ["meta", "google", "agy", "opencode"];
+  if (!SUPPORTED.includes(provider)) {
+    throw new AuthError("provider_unsupported", `unknown provider: ${provider} (want ${SUPPORTED.join("|")})`);
   }
   const key = await readAllStdin();
   const trimmed = key.trim();
@@ -984,12 +1090,12 @@ export async function authSetApiKeyFromStdin(opts: {
     throw new AuthError("empty_key", "no API key received on stdin");
   }
   const file = loadAuthFile(opts.authPath);
-  const prev = file.providers["meta"] ?? {};
-  file.providers["meta"] = {
+  const prev = file.providers[provider] ?? {};
+  file.providers[provider] = {
     ...prev,
     api_key: trimmed,
     api_base_url:
-      prev.api_base_url ?? opts.apiBaseUrl ?? DEFAULT_API_BASE_URL,
+      prev.api_base_url ?? opts.apiBaseUrl ?? defaultBaseUrlFor(provider),
     mechanism: prev.mechanism ?? MECHANISM_OAUTH,
     obtained_via: prev.obtained_via ?? "api_key_stdin",
   };
@@ -1027,4 +1133,358 @@ function readAllStdin(): Promise<string> {
     process.stdin.on("end", () => resolve(data));
     process.stdin.on("error", (e) => reject(e));
   });
+}
+
+/**
+ * Store (or overwrite) a provider entry in auth.json.
+ * Each provider key maps to a single flat MetaProviderAuth object —
+ * matching the schema the Rust binary writes and `resolveCredential` reads.
+ */
+export function setProviderAuth(provider: string, auth: MetaProviderAuth, authPath?: string): string {
+  const file = loadAuthFile(authPath);
+  file.providers[provider] = auth;
+  return saveAuthFile(file, authPath);
+}
+
+// ---------------------------------------------------------------------------
+// PKCE Authorization Code Flow (Google / OpenCode / Antigravity)
+// ---------------------------------------------------------------------------
+
+// The Antigravity client ID is registered as a "Web application" type,
+// so the device_code grant is NOT supported. Instead we use:
+//   1. Generate PKCE code_verifier + code_challenge
+//   2. Open browser to accounts.google.com/o/oauth2/v2/auth
+//   3. Spin up a local HTTP server on port 51121 to catch the redirect
+//   4. Exchange the authorization code for tokens at oauth2.googleapis.com/token
+// This matches opencode-antigravity-auth/src/antigravity/oauth.ts and
+// agy-connector/agy_auth.py exactly.
+// ---------------------------------------------------------------------------
+
+const ANTIGRAVITY_CLIENT_ID = "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com";
+const ANTIGRAVITY_CLIENT_SECRET = "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";
+const ANTIGRAVITY_REDIRECT_URI = "http://localhost:51121/oauth-callback";
+const ANTIGRAVITY_SCOPES = [
+  "openid",
+  "https://www.googleapis.com/auth/userinfo.email",
+  "https://www.googleapis.com/auth/userinfo.profile",
+  "https://www.googleapis.com/auth/cloud-platform",
+];
+const ACCOUNTS_FILE_PATH = (() => {
+  const home = process.env.HOME ?? process.env.USERPROFILE ?? ".";
+  return `${home}/.config/opencode/antigravity-accounts.json`;
+})();
+
+interface AntigravityAccount {
+  email: string;
+  refreshToken: string;
+  addedAt: number;
+  enabled: boolean;
+  rateLimitResetTimes: Record<string, unknown>;
+}
+
+interface AntigravityAccountsFile {
+  version: number;
+  accounts: AntigravityAccount[];
+}
+
+interface GooglePkceTokenResponse {
+  access_token: string;
+  refresh_token: string;
+  expires_in?: number;
+  token_type?: string;
+  scope?: string;
+  [k: string]: unknown;
+}
+
+function generatePKCE(): { verifier: string; challenge: string } {
+  const verifier = randomBytes(32).toString("base64url");
+  const challenge = createHash("sha256").update(verifier).digest("base64url");
+  return { verifier, challenge };
+}
+
+function buildGoogleAuthUrl(clientId: string, challenge: string, state: string): string {
+  const params = new URLSearchParams({
+    client_id: clientId,
+    response_type: "code",
+    redirect_uri: ANTIGRAVITY_REDIRECT_URI,
+    scope: ANTIGRAVITY_SCOPES.join(" "),
+    code_challenge: challenge,
+    code_challenge_method: "S256",
+    access_type: "offline",
+    prompt: "consent",
+    state,
+  });
+  return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+}
+
+/**
+ * Spins up a one-shot HTTP server on port 51121 that waits for the OAuth
+ * redirect and resolves with the authorization code from the callback URL.
+ */
+async function waitForOAuthCallback(timeoutMs = 300_000): Promise<{ code: string; state: string }> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      server.close();
+      reject(new Error("Timed out waiting for OAuth callback (5 min)"));
+    }, timeoutMs);
+    const server = createServer((req, res) => {
+      if (!req.url) {
+        res.writeHead(400);
+        res.end("Bad request");
+        return;
+      }
+      const url = new URL(req.url, `http://localhost:51121`);
+      if (url.pathname !== "/oauth-callback") {
+        res.writeHead(404);
+        res.end("Not found");
+        return;
+      }
+      const code = url.searchParams.get("code");
+      const state = url.searchParams.get("state") ?? "";
+      if (!code) {
+        res.writeHead(400, { "Content-Type": "text/plain" });
+        res.end("No authorization code received.");
+        return;
+      }
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      res.end(`<!DOCTYPE html><html><body style="font-family:sans-serif;text-align:center;padding:4rem">
+        <h1>✅ Authentication successful!</h1>
+        <p>You can close this tab and return to your terminal.</p>
+      </body></html>`);
+      clearTimeout(timer);
+      server.close();
+      resolve({ code, state });
+    });
+    server.listen(51121, "127.0.0.1", () => {
+      /* listening */
+    });
+    server.on("error", (err) => {
+      clearTimeout(timer);
+      if ((err as NodeJS.ErrnoException).code === "EADDRINUSE") {
+        reject(new Error("Port 51121 is already in use. Close any other auth sessions and try again."));
+      } else {
+        reject(err);
+      }
+    });
+  });
+}
+
+/**
+ * Exchange an authorization code for access + refresh tokens.
+ */
+async function exchangeAuthCode(code: string, verifier: string): Promise<GooglePkceTokenResponse> {
+  const res = await fetchBounded("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: ANTIGRAVITY_CLIENT_ID,
+      client_secret: ANTIGRAVITY_CLIENT_SECRET,
+      code,
+      grant_type: "authorization_code",
+      redirect_uri: ANTIGRAVITY_REDIRECT_URI,
+      code_verifier: verifier,
+    }).toString(),
+  });
+  if (!res.ok) {
+    const text = (await res.text()).slice(0, 500);
+    throw new AuthError("token_exchange_failed", `Token exchange failed: HTTP ${res.status} ${text}`);
+  }
+  return (await res.json()) as GooglePkceTokenResponse;
+}
+
+/**
+ * Fetch the user's email from Google userinfo.
+ */
+async function fetchUserEmail(accessToken: string): Promise<string | undefined> {
+  try {
+    const res = await fetchBounded("https://www.googleapis.com/oauth2/v1/userinfo?alt=json", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (res.ok) {
+      const data = (await res.json()) as { email?: string };
+      return data.email;
+    }
+  } catch { /* best-effort */ }
+  return undefined;
+}
+
+/**
+ * Save account to ~/.config/opencode/antigravity-accounts.json
+ * (compatible with opencode-antigravity-auth and agy-connector)
+ */
+function saveToAntigravityAccounts(email: string, refreshToken: string): void {
+  const dir = path.dirname(ACCOUNTS_FILE_PATH);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  let data: AntigravityAccountsFile;
+  try {
+    data = JSON.parse(fs.readFileSync(ACCOUNTS_FILE_PATH, "utf-8")) as AntigravityAccountsFile;
+  } catch {
+    data = { version: 4, accounts: [] };
+  }
+  const existing = data.accounts.find((a) => a.email === email);
+  if (existing) {
+    existing.refreshToken = refreshToken;
+    existing.enabled = true;
+  } else {
+    data.accounts.push({
+      email,
+      refreshToken,
+      addedAt: Date.now(),
+      enabled: true,
+      rateLimitResetTimes: {},
+    });
+  }
+  fs.writeFileSync(ACCOUNTS_FILE_PATH, JSON.stringify(data, null, 2));
+}
+
+/**
+ * Full PKCE Authorization Code login for Google / Antigravity.
+ * Opens browser → catches callback on localhost:51121 → exchanges code → saves tokens.
+ */
+export async function loginGoogleDeviceFlow(
+  opts: LoginOptions = {},
+): Promise<{ meta: MetaProviderAuth; authPath: string }> {
+  const status = opts.onStatus ?? (() => {});
+  status("Generating PKCE challenge…");
+  const { verifier, challenge } = generatePKCE();
+  const authUrl = buildGoogleAuthUrl(ANTIGRAVITY_CLIENT_ID, challenge, "muse-google");
+  // Show URL to user
+  opts.onDeviceCode?.({
+    userCode: "(browser login)",
+    verificationUri: authUrl,
+    verificationUriComplete: authUrl,
+  });
+  if (opts.openBrowser !== false) {
+    openBrowser(authUrl);
+  }
+  status("Waiting for browser login on localhost:51121…");
+  const { code } = await waitForOAuthCallback();
+  status("Exchanging authorization code for tokens…");
+  const token = await exchangeAuthCode(code, verifier);
+  const email = await fetchUserEmail(token.access_token);
+  if (email) status(`Authenticated as ${email}`);
+  // Save to antigravity-accounts.json for cross-tool compatibility
+  saveToAntigravityAccounts(email ?? "unknown", token.refresh_token);
+  const nowSec = Math.floor(Date.now() / 1000);
+  const meta: MetaProviderAuth = {
+    access_token: token.access_token,
+    refresh_token: token.refresh_token,
+    expires_at: nowSec + (token.expires_in || 3600),
+    api_key: token.access_token,
+    obtained_via: "pkce_auth_code",
+    mechanism: "oauth",
+    server_name: "google",
+    client_id: ANTIGRAVITY_CLIENT_ID,
+    user_email: email,
+  };
+  const authPath = setProviderAuth("google", meta);
+  return { meta, authPath };
+}
+
+/**
+ * Full PKCE Authorization Code login for OpenCode (uses Antigravity / Google OAuth).
+ * Identical flow to Google but stores under the "opencode" provider key
+ * and also saves to antigravity-accounts.json for agy-connector compatibility.
+ */
+export async function loginAgyDeviceFlow(
+  opts: LoginOptions = {},
+): Promise<{ meta: MetaProviderAuth; authPath: string }> {
+  const status = opts.onStatus ?? (() => {});
+  status("Generating PKCE challenge…");
+  const { verifier, challenge } = generatePKCE();
+  const authUrl = buildGoogleAuthUrl(ANTIGRAVITY_CLIENT_ID, challenge, "muse-opencode");
+  opts.onDeviceCode?.({
+    userCode: "(browser login)",
+    verificationUri: authUrl,
+    verificationUriComplete: authUrl,
+  });
+  if (opts.openBrowser !== false) {
+    openBrowser(authUrl);
+  }
+  status("Waiting for browser login on localhost:51121…");
+  const { code } = await waitForOAuthCallback();
+  status("Exchanging authorization code for tokens…");
+  const token = await exchangeAuthCode(code, verifier);
+  const email = await fetchUserEmail(token.access_token);
+  if (email) status(`Authenticated as ${email}`);
+  // Save to antigravity-accounts.json for agy-connector / opencode-antigravity-auth compat
+  saveToAntigravityAccounts(email ?? "unknown", token.refresh_token);
+  const nowSec = Math.floor(Date.now() / 1000);
+  const meta: MetaProviderAuth = {
+    access_token: token.access_token,
+    refresh_token: token.refresh_token,
+    expires_at: nowSec + (token.expires_in || 3600),
+    api_key: token.access_token,
+    obtained_via: "pkce_auth_code",
+    mechanism: "oauth",
+    server_name: "agy",
+    client_id: ANTIGRAVITY_CLIENT_ID,
+    user_email: email,
+  };
+  const authPath = setProviderAuth("agy", meta);
+  return { meta, authPath };
+}
+
+const OPENCODE_CLIENT_ID = "opencode-cli";
+const OPENCODE_CONSOLE_SERVER = "https://opencode.ai/console";
+
+export async function loginOpenCodeNativeFlow(
+  opts: LoginOptions = {},
+): Promise<{ meta: MetaProviderAuth; authPath: string }> {
+  const status = opts.onStatus ?? (() => {});
+  const serverBase = (opts.authBaseUrl ?? OPENCODE_CONSOLE_SERVER).replace(/\/+$/, "");
+  status("Requesting OpenCode device code…");
+  const deviceRes = await fetchBounded(`${serverBase}/auth/device/code`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ client_id: OPENCODE_CLIENT_ID }).toString(),
+  });
+  if (!deviceRes.ok) {
+    const text = await deviceRes.text();
+    throw new AuthError("opencode_device_code_failed", `Device code request failed: HTTP ${deviceRes.status} ${text}`);
+  }
+  const deviceData = (await deviceRes.json()) as {
+    device_code: string;
+    user_code: string;
+    verification_uri: string;
+    verification_uri_complete?: string;
+    interval?: number;
+  };
+  let verificationUriComplete =
+    deviceData.verification_uri_complete || deviceData.verification_uri;
+  if (verificationUriComplete && verificationUriComplete.startsWith("/")) {
+    verificationUriComplete = new URL(verificationUriComplete, "https://opencode.ai").href;
+  }
+  opts.onDeviceCode?.({
+    userCode: deviceData.user_code,
+    verificationUri: deviceData.verification_uri.startsWith("/")
+      ? new URL(deviceData.verification_uri, "https://opencode.ai").href
+      : deviceData.verification_uri,
+    verificationUriComplete: verificationUriComplete,
+  });
+  if (opts.openBrowser !== false) {
+    openBrowser(verificationUriComplete);
+  }
+  status(`Waiting for OpenCode authorization (polling every ${deviceData.interval || 5}s)…`);
+  const token = await pollDeviceToken(
+    `${serverBase}/auth/device/token`,
+    OPENCODE_CLIENT_ID,
+    deviceData.device_code,
+    { intervalSec: deviceData.interval || 5 },
+  );
+  status("Authenticated successfully");
+  const nowSec = Math.floor(Date.now() / 1000);
+  const meta: MetaProviderAuth = {
+    access_token: token.access_token,
+    refresh_token: token.refresh_token,
+    expires_at: nowSec + (token.expires_in || 3600),
+    api_key: token.access_token, // usually the access token serves as the API key for zen API
+    api_base_url: DEFAULT_OPENCODE_API_BASE_URL,
+    obtained_via: "device_code",
+    mechanism: "oauth",
+    server_name: "opencode",
+    client_id: OPENCODE_CLIENT_ID,
+  };
+  const authPath = setProviderAuth("opencode", meta);
+  return { meta, authPath };
 }

@@ -211,8 +211,26 @@ export function extractDeltaText(evt: unknown): DeltaText {
     if (typeof reasoning === "string" && reasoning.length > 0) {
       out.thought = reasoning;
     }
-    const tc = delta.tool_calls as DeltaText["toolCallParts"];
-    if (Array.isArray(tc)) out.toolCallParts = tc;
+    // Tool calls arrive in two shapes: the OpenAI-nested
+    // ({id, type, function:{name, arguments}}) and some providers' flat
+    // ({index, id, name, arguments}). The Gemini→OpenAI normalizer emits the
+    // nested form, so reading only the flat keys silently drops every tool
+    // call — the agent then looks like it did nothing.
+    const tc = delta.tool_calls;
+    if (Array.isArray(tc)) {
+      out.toolCallParts = tc.map((raw) => {
+        const r = (raw ?? {}) as Record<string, unknown>;
+        const fn = (r.function ?? {}) as Record<string, unknown>;
+        const name = typeof fn.name === "string" ? fn.name : r.name;
+        const args = typeof fn.arguments === "string" ? fn.arguments : r.arguments;
+        return {
+          ...(typeof r.index === "number" ? { index: r.index } : {}),
+          ...(typeof r.id === "string" ? { id: r.id } : {}),
+          ...(typeof name === "string" ? { name } : {}),
+          ...(typeof args === "string" ? { arguments: args } : {}),
+        };
+      });
+    }
   } catch {
     /* never crash the stream on a weird token */
   }
@@ -288,7 +306,16 @@ export function renderAssistant(text: string): string {
               .join("");
           }
         }
-        return ln;
+        let formatted = ln.replace(
+          /\[([^\]]+)\]\(([^)]+)\)/g,
+          chalk.bold.blue("[$1]") + chalk.dim("($2)"),
+        );
+        formatted = formatted.replace(/\*\*([^*]+)\*\*/g, chalk.bold("$1"));
+        formatted = formatted.replace(
+          /(^|[^*])\*([^*\n]+)\*/g,
+          (_m, pre: string, it: string) => `${pre}${chalk.dim(it)}`,
+        );
+        return formatted;
       } catch {
         return ln;
       }

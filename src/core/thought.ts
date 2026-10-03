@@ -50,3 +50,19 @@ export const LEARNING_DIRECTIVE =
   "On user correction, restated preference, or a recovered mistake, call the " +
   "`learn` tool proactively to persist the lesson (scope: project for " +
   "repo-specific lessons, global for cross-project habits).";
+
+/**
+ * Tool catalog directive: the model also sees API tool definitions, but some
+ * gateways describe them weakly — so the exact tool names live in the system
+ * prompt too. Without this the model invents names like `run_command` and
+ * narrates instead of acting.
+ */
+export const TOOL_CATALOG_DIRECTIVE =
+  "Workspace tools (exact names — these are the ONLY tools that exist; never invent others like run_command): " +
+  "ast_search {symbol} (zero-cost symbol search, prefer over grep); " +
+  "read_file {path,offset,limit}, write_file {path,content}, list_dir {path}; " +
+  "bash {command,timeout_ms} (shell in the workspace: mkdir/cp/mv/rm/git/npm/python3 — for ANY shell or file operation call bash); " +
+  "search {pattern,dir,max_matches} (literal text search); " +
+  "manage_context {action=status|compact|clear}; learn {lesson,scope,category}. " +
+  "bridge_*/plugin_* tools exist only when attached. " +
+  "When a task needs files or shell, emit the tool call in the SAME turn — do not narrate instead of acting.";
