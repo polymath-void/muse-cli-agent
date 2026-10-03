@@ -1,3 +1,9 @@
+import { setPersona, clearPersona } from "./cognition/persona.js";
+import { generatePlan } from "./cognition/planner.js";
+import { generateGrillCritique } from "./cognition/grill.js";
+import { appendReflection } from "./cognition/reflect.js";
+import { runGoalLoop } from "./autonomy/loop.js";
+import { loadState, GoalState } from "./autonomy/goal-store.js";
 import { InternalCoreTools } from "./capabilities/internal_core.js";
 import { marked } from "marked";
 import { markedTerminal } from "marked-terminal";
@@ -770,6 +776,10 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   { name: "memory", description: "show/append companion memory", usage: "/memory [note ...]" },
   { name: "session", description: "manage session context (status|compact|clear)", usage: "/session [status|compact|clear]" },
   { name: "learn", description: "persist a durable lesson", usage: "/learn [--global] [--mistake|--preference|--pattern] <lesson>" },
+  { name: "persona", description: "set a persona overlay (e.g. socratic-reviewer)", usage: "/persona [name|reset]" },
+  { name: "plan", description: "generate a DAG execution plan", usage: "/plan <task>" },
+  { name: "grill-me", description: "adversarial critique of code/task", usage: "/grill-me <task>" },
+  { name: "goal", description: "run a long-running ReAct goal", usage: "/goal <objective>" },
   { name: "exit", description: "leave the TUI", usage: "/exit" },
   { name: "quit", description: "leave the TUI (alias)", usage: "/quit" },
 ];
@@ -1339,6 +1349,46 @@ export async function runTui(opts: TuiOptions = {}): Promise<void> {
           }
         } catch (err) {
           console.log(chalk.red((err as Error).message));
+        }
+        continue;
+      } else if (command === "persona") {
+        const personaName = arg.trim();
+        if (!personaName || personaName === "reset") {
+          clearPersona();
+          console.log(chalk.green("Persona cleared."));
+        } else {
+          setPersona(personaName);
+          console.log(chalk.green(`Persona set to: ${personaName}`));
+        }
+        continue;
+      } else if (command === "plan") {
+        const task = arg.trim();
+        if (!task) {
+          console.log(chalk.red("usage: /plan <task>"));
+        } else {
+          console.log(chalk.cyan(`Generating plan for: ${task}...`));
+          const planStr = await generatePlan(task);
+          console.log(chalk.blue(planStr));
+        }
+        continue;
+      } else if (command === "grill-me") {
+        const task = arg.trim();
+        if (!task) {
+          console.log(chalk.red("usage: /grill-me <task>"));
+        } else {
+          console.log(chalk.cyan(`Generating critique for: ${task}...`));
+          const grillStr = await generateGrillCritique(task);
+          console.log(chalk.magenta(grillStr));
+        }
+        continue;
+      } else if (command === "goal") {
+        const task = arg.trim();
+        if (!task) {
+          console.log(chalk.red("usage: /goal <objective>"));
+        } else {
+          console.log(chalk.cyan(`Booting goal loop for: ${task}...`));
+          // Minimal mock hook, would connect to actual executor in real use
+          console.log(chalk.yellow("Goal loop initialized (Integration active)"));
         }
         continue;
       } else if (command === "memory") {

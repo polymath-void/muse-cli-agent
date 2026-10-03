@@ -45,6 +45,7 @@
     "chalk": "^6.0.1",
     "cli-highlight": "^2.1.11",
     "commander": "^15.0.0",
+    "cron-parser": "^5.10.1",
     "inquirer": "^14.2.2",
     "marked": "^15.0.12",
     "marked-terminal": "^7.3.0"
