@@ -29,6 +29,19 @@ export interface ResolvedSelection {
   effort: ReasoningEffort;
 }
 
+
+export function resolveModelAlias(model: string): string {
+  const lower = model.toLowerCase().replace(/\s+/g, "-");
+  
+  // User's custom aliases for gemini
+  if (lower === "gemini-3.1-pro-high") return "gemini-3.1-pro-preview";
+  if (lower === "gemini-3.1-pro-lite" || lower === "gemini-3.1-flash-lite") return "gemini-3.1-flash-lite";
+  if (lower === "gemini-3.1-pro") return "gemini-3.1-pro-preview";
+  if (lower === "gemini-2.5-pro") return "gemini-3.1-pro-preview";
+  
+  return model;
+}
+
 export function gatewayForModel(model: string): GatewayId {
   const m = model.toLowerCase();
   if (m.startsWith("gemini") || m.includes("google")) return "google";
@@ -68,10 +81,10 @@ export function resolveInitialSelection(
   remembered: RememberedSelection | null,
 ): ResolvedSelection {
   const model =
-    explicit.model && explicit.model.trim().length > 0
-      ? explicit.model.trim()
-      : remembered?.model && remembered.model.trim().length > 0
-        ? remembered.model.trim()
+    explicit.model && resolveModelAlias(explicit.model.trim()).length > 0
+      ? resolveModelAlias(explicit.model.trim())
+      : remembered?.model && resolveModelAlias(remembered.model.trim()).length > 0
+        ? resolveModelAlias(remembered.model.trim())
         : "muse-spark-1.3";
 
   let provider: GatewayId | undefined = explicit.provider;

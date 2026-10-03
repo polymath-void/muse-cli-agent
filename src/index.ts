@@ -618,7 +618,7 @@ export async function main(argv: string[] = process.argv): Promise<void> {
         return;
       }
       const global = program.opts() as Record<string, unknown>;
-      const resolved = resolveCredential();
+      const resolved = resolveCredential(undefined, global.provider as string | undefined);
       if (!resolved) {
         console.error(chalk.red("not logged in — run `muse-ts login` or set META_API_KEY"));
         process.exitCode = 1;

@@ -38,6 +38,7 @@ import { randomUUID } from "node:crypto";
 import { search, select, input, editor } from "@inquirer/prompts";
 import chalk from "chalk";
 import { resolveCredential, DEFAULT_API_BASE_URL } from "./auth.js";
+import { resolveModelAlias } from "./core/provider.js";
 import { runInit } from "./nodeos.js";
 import { NanoRegistry, FsNano, MentionNano, PluginNano, PermissionNano, SessionNano } from "./services/index.js";
 import { loadTasks, addTask, setTaskStatus, nextTasks, readMemory, appendMemory } from "./companion/index.js";
@@ -921,7 +922,7 @@ export async function runTui(opts: TuiOptions = {}): Promise<void> {
   let effort: ReasoningEffort = opts.reasoningEffort ?? "high";
 
   // Resolve credentials (env wins).
-  let resolved = resolveCredential();
+  let resolved = resolveCredential(undefined, opts.provider);
   let baseUrl = opts.baseUrl ?? resolved?.baseUrl ?? DEFAULT_API_BASE_URL;
   if (provider === "meta" && !resolved) {
     console.log(
@@ -1086,7 +1087,7 @@ export async function runTui(opts: TuiOptions = {}): Promise<void> {
         console.log(helpText());
         continue;
       } else if (command === "status") {
-        resolved = resolveCredential();
+        resolved = resolveCredential(undefined, opts.provider);
         console.log(
           [
             `${chalk.dim("auth:")} ${resolved ? `${chalk.green("logged in")} via ${resolved.source}` : chalk.red("logged out")}`,
@@ -1107,7 +1108,13 @@ export async function runTui(opts: TuiOptions = {}): Promise<void> {
           console.log(`current model: ${chalk.green(client.model)}`);
           try {
             const models = await client.listModels();
-            const displayModels = models;
+                        let displayModels = models;
+            if (client.provider === "meta") {
+               const extras = ["gemini-3.1-pro-high", "gemini-3.1-pro-lite", "gemini-3.1-pro", "gemini-2.5-pro"];
+               for (const e of extras) {
+                   if (!displayModels.includes(e)) displayModels.push(e);
+               }
+            }
             const picked: string = await select({
               message: "Select model",
               choices: displayModels.map((m) => ({
@@ -1117,8 +1124,8 @@ export async function runTui(opts: TuiOptions = {}): Promise<void> {
               pageSize: 12,
             });
             if (picked && picked !== client.model) {
-              model = picked;
-              (client as { model: string }).model = picked;
+              model = resolveModelAlias(picked);
+              (client as { model: string }).model = resolveModelAlias(picked);
               console.log(`model → ${chalk.green(picked)}`);
             }
           } catch {
@@ -1455,7 +1462,7 @@ export async function runTui(opts: TuiOptions = {}): Promise<void> {
     appendSessionLine(session, { type: "user", ts: new Date().toISOString(), content: turnText }, noLog);
 
     // Refresh credentials each turn (env may change; login may have run elsewhere).
-    resolved = resolveCredential();
+    resolved = resolveCredential(undefined, opts.provider);
     if (resolved) {
       client.setToken(resolved.token);
       if (!opts.baseUrl) {
