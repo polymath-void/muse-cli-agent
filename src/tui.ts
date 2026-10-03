@@ -1326,10 +1326,49 @@ export async function runTui(opts: TuiOptions = {}): Promise<void> {
           ]
         });
 
+        const auth = await import("./auth.js");
         if (picked === "meta") {
           console.log(chalk.bold.cyan("Meta login (device flow, native TypeScript)"));
-          const { loginDeviceFlow } = await import("./auth.js");
-          const { meta, authPath } = await loginDeviceFlow({
+          await auth.loginDeviceFlow({
+            openBrowser: true,
+            onStatus: (m) => console.log(chalk.dim(`… ${m}`)),
+            onDeviceCode: (info) => {
+              console.log("");
+              console.log(`  ${chalk.dim("1. Open:")} ${chalk.cyan.underline(info.verificationUriComplete)}`);
+              console.log(`  ${chalk.dim("2. Code:")} ${chalk.bold.yellow(info.userCode)}`);
+              console.log("");
+            },
+          });
+          console.log(chalk.green("Login complete."));
+        } else if (picked === "agy") {
+          console.log(chalk.bold.cyan("Agy login (PKCE flow, native TypeScript)"));
+          await auth.loginAgyDeviceFlow({
+            openBrowser: true,
+            onStatus: (m) => console.log(chalk.dim(`… ${m}`)),
+            onDeviceCode: (info) => {
+              console.log("");
+              console.log(`  ${chalk.dim("Open this URL in your browser to authenticate:")}`);
+              console.log(`  ${chalk.cyan.underline(info.verificationUriComplete)}`);
+              console.log("");
+            },
+          });
+          console.log(chalk.green("Login complete."));
+        } else if (picked === "google") {
+          console.log(chalk.bold.cyan("Google login (PKCE flow, native TypeScript)"));
+          await auth.loginGoogleDeviceFlow({
+            openBrowser: true,
+            onStatus: (m) => console.log(chalk.dim(`… ${m}`)),
+            onDeviceCode: (info) => {
+              console.log("");
+              console.log(`  ${chalk.dim("Open this URL in your browser to authenticate:")}`);
+              console.log(`  ${chalk.cyan.underline(info.verificationUriComplete)}`);
+              console.log("");
+            },
+          });
+          console.log(chalk.green("Login complete."));
+        } else if (picked === "opencode") {
+          console.log(chalk.bold.cyan("OpenCode login (device flow, native TypeScript)"));
+          await auth.loginOpenCodeNativeFlow({
             openBrowser: true,
             onStatus: (m) => console.log(chalk.dim(`… ${m}`)),
             onDeviceCode: (info) => {
@@ -1341,25 +1380,7 @@ export async function runTui(opts: TuiOptions = {}): Promise<void> {
           });
           console.log(chalk.green("Login complete."));
         } else {
-           const apiKey = await input({ message: `Enter API Key for ${picked}:` });
-           const fs = await import("node:fs");
-           const path = await import("node:path");
-           const os = await import("node:os");
-           
-           const confDir = path.join(os.homedir(), ".config", "muse");
-           if (!fs.existsSync(confDir)) fs.mkdirSync(confDir, { recursive: true });
-           const authFile = path.join(confDir, "auth.json");
-           
-           let config: any = { schema_version: 1, providers: {} };
-           if (fs.existsSync(authFile)) {
-               try { config = JSON.parse(fs.readFileSync(authFile, "utf8")); } catch {}
-           }
-           if (!config.providers) config.providers = {};
-           if (!config.providers[picked]) config.providers[picked] = {};
-           config.providers[picked].api_key = apiKey;
-           
-           fs.writeFileSync(authFile, JSON.stringify(config, null, 2));
-           console.log(chalk.green(`API key for ${picked} stored in ${authFile}.`));
+           console.log(chalk.red(`Unsupported provider: ${picked}`));
         }
         
         opts.provider = picked;
