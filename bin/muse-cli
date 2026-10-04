@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Muse CLI Agent launcher — platform-independent
+# Resolve symlinks so `muse-cli` works via $PREFIX/bin symlink.
+SOURCE="$0"
+while [ -L "$SOURCE" ]; do
+  DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ "$SOURCE" != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+export PYTHONPATH="$PROJECT_ROOT/src:$PYTHONPATH"
+cd "$PROJECT_ROOT/src"
+exec python3 run.py "$@"

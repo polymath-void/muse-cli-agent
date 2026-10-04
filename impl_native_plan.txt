@@ -1,8 +1,0 @@
-The user has APPROVED your Omni-Gateway Native Super-Agent Blueprint!
-
-Your mission is to implement as much of this architecture as possible in this run. Focus first on the core foundations:
-1. `src/kernel/` (Permissions, Trace, Redactor, Budget)
-2. `src/autonomy/` (The `/goal` ReAct loop with atomic state)
-3. `src/gateway/` (The HTTP/Web scraper with SSRF blocker)
-
-You have full autonomy. Write the code, update `src/index.ts` and `src/tui.ts` to register the new commands, and ensure all unit tests pass before committing. Do not stall.
